@@ -1,15 +1,12 @@
 const db = require('../../config/db');
 
-// --- Controladores para el Panel de Administración ---
-
 // Obtener todas las preguntas
 const getQuestions = async (req, res) => {
   try {
-    // const { rows } = await db.query('SELECT * FROM Questions ORDER BY id ASC');
-    // res.json(rows);
-    res.json([{id: 1, question_text: "Pregunta de ejemplo desde la API"}]); // Placeholder
+    const { rows } = await db.query('SELECT * FROM Questions ORDER BY id ASC');
+    res.json(rows);
   } catch (err) {
-    console.error(err.message);
+    console.error("Error en getQuestions:", err.message);
     res.status(500).send('Error en el servidor');
   }
 };
@@ -18,32 +15,33 @@ const getQuestions = async (req, res) => {
 const createQuestion = async (req, res) => {
   try {
     const { question_text, video_url, pause_timestamp_secs, points, option_1, option_2, option_3, option_4, correct_option } = req.body;
-    // Lógica para guardar la nueva pregunta en la base de datos
-    // const newQuestion = await db.query(
-    //   "INSERT INTO Questions (...) VALUES ($1, $2, ...) RETURNING *",
-    //   [question_text, ...]
-    // );
-    // res.status(201).json(newQuestion.rows[0]);
-     res.status(201).json({ message: 'Pregunta creada (simulado)', data: req.body }); // Placeholder
+
+    // Lógica real para insertar en la base de datos
+    const newQuestion = await db.query(
+      "INSERT INTO Questions (question_text, video_url, pause_timestamp_secs, points, option_1, option_2, option_3, option_4, correct_option) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
+      [question_text, video_url, pause_timestamp_secs, points, option_1, option_2, option_3, option_4, correct_option]
+    );
+
+    // Devolvemos la pregunta que se acaba de crear en la base de datos
+    res.status(201).json(newQuestion.rows[0]);
+
   } catch (err) {
-    console.error(err.message);
+    console.error("Error en createQuestion:", err.message);
     res.status(500).send('Error en el servidor');
   }
 };
 
-
-// --- Controladores para la personalización ---
-
+// Obtener las configuraciones del juego
 const getGameSettings = async (req, res) => {
-    // Lógica para obtener todas las configuraciones (logo, fondo, etc.)
-    res.json({ main_logo: 'url/logo.png', background_image_start: 'url/bg.jpg' }); // Placeholder
+    // En el futuro, leerías esto desde una tabla 'GameSettings'
+    res.json({ main_logo: 'url/logo.png', background_image_start: 'url/bg.jpg' });
 };
 
+// Actualizar las configuraciones del juego
 const updateGameSettings = async (req, res) => {
-    // Lógica para actualizar una configuración específica
-    res.json({ message: 'Configuración actualizada (simulado)'}); // Placeholder
+    // En el futuro, harías un UPDATE en la tabla 'GameSettings'
+    res.json({ message: 'Configuración actualizada (simulado)'});
 };
-
 
 module.exports = {
   getQuestions,
