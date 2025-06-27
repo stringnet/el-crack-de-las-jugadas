@@ -5,9 +5,10 @@ services:
     image: postgres:14-alpine
     restart: always
     environment:
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=supersecretpassword
-      - POSTGRES_DB=crack_jugadas_db
+      # Lee las credenciales desde el archivo .env
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -19,14 +20,17 @@ services:
       dockerfile: Dockerfile
     restart: always
     ports:
-      - '8080:8080'
+      # Lee el puerto desde el archivo .env
+      - '${BACKEND_PORT:-8080}:${BACKEND_PORT:-8080}' # El :-8080 es un valor por defecto si la variable no existe
     depends_on:
       - db
     environment:
-      - DATABASE_URL=postgres://admin:supersecretpassword@db:5432/crack_jugadas_db
-      - FRONTEND_URL=http://localhost:3000
-      - ADMIN_URL=http://localhost:3001
-      - PORT=8080
+      # Construye la URL de conexión usando las variables del .env
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # Estas URLs también podrían estar en el .env si quieres
+      FRONTEND_URL: http://localhost:3000
+      ADMIN_URL: http://localhost:3001
+      PORT: ${BACKEND_PORT:-8080}
 
   frontend:
     build:
@@ -38,7 +42,7 @@ services:
     depends_on:
       - backend
     environment:
-      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8080
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:${BACKEND_PORT:-8080}
 
   admin-panel:
     build:
@@ -50,7 +54,7 @@ services:
     depends_on:
       - backend
     environment:
-      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8080
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:${BACKEND_PORT:-8080}
 
 volumes:
   postgres_data:
