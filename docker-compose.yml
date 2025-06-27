@@ -37,8 +37,6 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     restart: always
-    ports:
-      - '3003:3000'
     depends_on:
       - backend
     environment:
