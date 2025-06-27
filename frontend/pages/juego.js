@@ -1,45 +1,59 @@
+// pages/juego.js
 import { useEffect, useState } from 'react';
 import io from 'socket.io-client';
+import Timer from '../components/Timer';
+import AnswerOptions from '../components/AnswerOptions';
 
 const socket = io(`${process.env.NEXT_PUBLIC_BACKEND_URL}/players`);
 
 export default function GamePage() {
+  const [gameState, setGameState] = useState('waiting'); // waiting, question, answered
   const [question, setQuestion] = useState(null);
 
   useEffect(() => {
     const name = sessionStorage.getItem('playerName');
-    socket.emit('player:join', name);
+    if (name) {
+      socket.emit('player:join', { name });
+    }
 
     socket.on('server:new_question', (newQuestion) => {
-      console.log('Nueva pregunta recibida:', newQuestion);
       setQuestion(newQuestion);
+      setGameState('question');
+    });
+
+    socket.on('server:time_up', () => {
+        setGameState('waiting');
+        setQuestion(null);
     });
 
     return () => {
       socket.off('server:new_question');
+      socket.off('server:time_up');
     };
   }, []);
-
-  const handleAnswer = (option) => {
-    socket.emit('player:submit_answer', { questionId: question.id, answer: option });
-    setQuestion(null); // Bloquear respuestas hasta la siguiente pregunta
+  
+  const handleSelectAnswer = (answerIndex) => {
+    socket.emit('player:submit_answer', { questionId: question.id, answerId: answerIndex });
+    setGameState('answered');
   };
 
-  return (
-    <div>
-      <h1>¡A Jugar!</h1>
-      {question ? (
-        <div>
-          <h2>{question.text}</h2>
-          {/* Aquí iría el componente <AnswerOptions /> */}
-          <button onClick={() => handleAnswer(1)}>{question.option1}</button>
-          <button onClick={() => handleAnswer(2)}>{question.option2}</button>
-          <button onClick={() => handleAnswer(3)}>{question.option3}</button>
-          <button onClick={() => handleAnswer(4)}>{question.option4}</button>
-        </div>
-      ) : (
-        <h2>Esperando la siguiente jugada...</h2>
-      )}
-    </div>
-  );
+  const renderContent = () => {
+    switch(gameState) {
+      case 'question':
+        return (
+          <>
+            <Timer duration={10} onTimeUp={() => setGameState('waiting')} />
+            <h2>{question.question_text}</h2>
+            <AnswerOptions question={question} onSelectAnswer={handleSelectAnswer} />
+          </>
+        );
+      case 'answered':
+        return <h2>¡Respuesta enviada! Esperando la siguiente jugada...</h2>;
+      case 'waiting':
+      default:
+        return <h2>Esperando que el administrador envíe la siguiente jugada...</h2>;
+    }
+  }
+
+  return <div>{renderContent()}</div>;
 }
