@@ -2,11 +2,13 @@
 import { useState } from 'react';
 
 const QuestionForm = ({ onSubmit, initialData = {} }) => {
+  // El estado inicial ahora incluye todos los campos con valores por defecto
   const [formData, setFormData] = useState({
     question_text: initialData.question_text || '',
     video_url: initialData.video_url || '',
-    pause_timestamp_secs: initialData.pause_timestamp_secs || 0,
+    pause_timestamp_secs: initialData.pause_timestamp_secs || 5,
     points: initialData.points || 10,
+    time_limit_secs: initialData.time_limit_secs || 15,
     option_1: initialData.option_1 || '',
     option_2: initialData.option_2 || '',
     option_3: initialData.option_3 || '',
@@ -14,29 +16,44 @@ const QuestionForm = ({ onSubmit, initialData = {} }) => {
     correct_option: initialData.correct_option || 1,
   });
 
+  // Función genérica para manejar los cambios de cualquier input
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Función que se ejecuta al enviar el formulario
   const handleSubmit = (e) => {
     e.preventDefault();
     onSubmit(formData);
   };
 
-  // Estilos simples para el formulario
-  const inputStyle = { width: '100%', padding: '8px', margin: '5px 0', boxSizing: 'border-box' };
+  // Estilos para mantener la consistencia del formulario
+  const inputStyle = { width: '100%', padding: '8px', margin: '5px 0 15px 0', boxSizing: 'border-box', fontSize: '1rem' };
   const labelStyle = { fontWeight: 'bold', marginTop: '10px', display: 'block' };
 
   return (
     <form onSubmit={handleSubmit} style={{ maxWidth: '600px', margin: '20px 0', padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
+      
       <label style={labelStyle}>Texto de la Pregunta</label>
-      <input style={inputStyle} type="text" name="question_text" value={formData.question_text} onChange={handleChange} required />
+      <input style={inputStyle} type="text" name="question_text" value={formData.question_text} onChange={handleChange} placeholder="Ej: ¿Qué jugador marcó el gol?" required />
       
       <label style={labelStyle}>URL del Video</label>
-      <input style={inputStyle} type="text" name="video_url" value={formData.video_url} onChange={handleChange} required />
+      <input style={inputStyle} type="text" name="video_url" value={formData.video_url} onChange={handleChange} placeholder="https://ejemplo.com/video.mp4" required />
       
-      {/* ... otros campos ... */}
+      <label style={labelStyle}>Segundo de Pausa del Video</label>
+      <input style={inputStyle} type="number" name="pause_timestamp_secs" value={formData.pause_timestamp_secs} onChange={handleChange} required />
+
+      <div style={{ display: 'flex', gap: '20px' }}>
+        <div style={{ flex: 1 }}>
+            <label style={labelStyle}>Puntaje por Respuesta Correcta</label>
+            <input style={inputStyle} type="number" name="points" value={formData.points} onChange={handleChange} required />
+        </div>
+        <div style={{ flex: 1 }}>
+            <label style={labelStyle}>Tiempo para Responder (segundos)</label>
+            <input style={inputStyle} type="number" name="time_limit_secs" value={formData.time_limit_secs} onChange={handleChange} required />
+        </div>
+      </div>
       
       <label style={labelStyle}>Opción 1</label>
       <input style={inputStyle} type="text" name="option_1" value={formData.option_1} onChange={handleChange} required />
@@ -58,7 +75,7 @@ const QuestionForm = ({ onSubmit, initialData = {} }) => {
         <option value={4}>Opción 4</option>
       </select>
 
-      <button type="submit" style={{ marginTop: '20px', padding: '10px 20px' }}>Guardar Pregunta</button>
+      <button type="submit" style={{ marginTop: '20px', padding: '10px 20px', fontSize: '1rem' }}>Guardar Pregunta</button>
     </form>
   );
 };
