@@ -18,11 +18,13 @@ const getQuestions = async (req, res) => {
  */
 const createQuestion = async (req, res) => {
   try {
-    const { question_text, video_url, pause_timestamp_secs, points, option_1, option_2, option_3, option_4, correct_option } = req.body;
+    // Añadimos 'time_limit_secs' a la lista de variables que recibimos
+    const { question_text, video_url, pause_timestamp_secs, points, time_limit_secs, option_1, option_2, option_3, option_4, correct_option } = req.body;
     
+    // Y lo añadimos a la consulta INSERT
     const newQuestion = await db.query(
-      "INSERT INTO questions (question_text, video_url, pause_timestamp_secs, points, option_1, option_2, option_3, option_4, correct_option) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
-      [question_text, video_url, pause_timestamp_secs, points, option_1, option_2, option_3, option_4, correct_option]
+      "INSERT INTO questions (question_text, video_url, pause_timestamp_secs, points, time_limit_secs, option_1, option_2, option_3, option_4, correct_option) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *",
+      [question_text, video_url, pause_timestamp_secs, points, time_limit_secs, option_1, option_2, option_3, option_4, correct_option]
     );
     
     res.status(201).json(newQuestion.rows[0]);
