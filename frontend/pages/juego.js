@@ -85,7 +85,7 @@ export default function GamePage() {
       case 'question':
         return (
           <>
-            <Timer duration={10} onTimeUp={() => { setQuestion(null); setGameState('playing'); }} />
+            <Timer duration={question.time_limit_secs || 15} onTimeUp={() => { setQuestion(null); setGameState('playing'); }} />
             <h2>{question.question_text}</h2>
             <AnswerOptions question={question} onSelectAnswer={handleSelectAnswer} />
           </>
