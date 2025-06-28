@@ -8,10 +8,15 @@ let socket;
 
 export default function GamePage() {
   const router = useRouter();
-  const [gameState, setGameState] = useState('waiting_for_start');
-  const [question, setQuestion] = useState(null); // Estado para la pregunta actual
+  // Añadimos el nuevo estado 'game_over'
+  const [gameState, setGameState] = useState('waiting_for_start'); 
+  const [question, setQuestion] = useState(null);
   const [error, setError] = useState('');
   const [playerName, setPlayerName] = useState('');
+  
+  // Nuevos estados para guardar nuestro ID y puntaje final
+  const [socketId, setSocketId] = useState(null);
+  const [finalScore, setFinalScore] = useState(0);
 
   useEffect(() => {
     const name = sessionStorage.getItem('playerName');
@@ -25,13 +30,15 @@ export default function GamePage() {
     socket = io(`${backendUrl}/players`);
     
     socket.on('connect', () => {
+        // Al conectar, guardamos nuestro propio ID de socket. Es nuestra identificación.
+        setSocketId(socket.id);
         socket.emit('player:join', { name });
     });
 
+    // --- MANEJADORES DE EVENTOS DEL SERVIDOR ---
     socket.on('server:game_started', () => {
-      console.log("Evento 'game_started' recibido! Reseteando vista.");
+      setQuestion(null);
       setError('');
-      setQuestion(null); // CORRECCIÓN: Limpiamos cualquier pregunta anterior
       setGameState('playing');
     });
 
@@ -40,9 +47,20 @@ export default function GamePage() {
       setGameState('question');
     });
     
-    socket.on('server:game_over', () => {
-        alert("¡El juego ha terminado! Viendo el ranking final...");
-        router.push('/ranking');
+    // --- LÓGICA MODIFICADA PARA EL FIN DEL JUEGO ---
+    socket.on('server:game_over', ({ finalRanking }) => {
+        console.log("Juego terminado, mostrando puntaje final.");
+        
+        // Buscamos nuestro propio puntaje en el ranking que nos envió el servidor
+        const myResult = finalRanking.find(player => player.id === socket.id);
+        if (myResult) {
+            setFinalScore(myResult.score);
+        } else {
+            setFinalScore(0); // Si por alguna razón no nos encontramos, mostramos 0
+        }
+        
+        // Cambiamos al nuevo estado 'game_over' en lugar de redirigir
+        setGameState('game_over');
     });
 
     socket.on('server:error', (data) => {
@@ -59,6 +77,7 @@ export default function GamePage() {
     setGameState('answered');
   };
 
+  // Función para renderizar el contenido según el estado del juego
   const renderContent = () => {
     if (error) return <h2 style={{ color: 'red' }}>Error: {error}</h2>;
 
@@ -76,8 +95,26 @@ export default function GamePage() {
       case 'playing':
         return <h2>¡Juego en curso! Esperando que el admin envíe la siguiente pregunta...</h2>;
       case 'waiting_for_start':
-      default:
         return <h2>¡Bienvenido, {playerName}! Esperando que el administrador inicie el juego...</h2>;
+      
+      // --- NUEVA VISTA PARA MOSTRAR EL PUNTAJE FINAL ---
+      case 'game_over':
+        return (
+            <div style={{ textAlign: 'center' }}>
+                <h1 style={{ fontSize: '3em' }}>¡Juego Terminado!</h1>
+                <h2 style={{ fontSize: '2em', margin: '20px 0' }}>
+                    Tu puntaje final es: <span style={{ color: '#007bff', fontSize: '1.5em' }}>{finalScore}</span>
+                </h2>
+                <button 
+                    onClick={() => router.push('/ranking')}
+                    style={{ padding: '15px 30px', fontSize: '1.2rem', cursor: 'pointer', border: 'none', borderRadius: '8px', backgroundColor: 'green', color: 'white' }}
+                >
+                    Ver Ranking Completo
+                </button>
+            </div>
+        );
+      default:
+        return <h2>Cargando...</h2>;
     }
   }
 
