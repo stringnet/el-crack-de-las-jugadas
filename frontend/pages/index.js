@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Importa useEffect
 import { useRouter } from 'next/router';
 
 export default function Home() {
