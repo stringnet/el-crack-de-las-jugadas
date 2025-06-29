@@ -1,6 +1,7 @@
 const { Server } = require('socket.io');
 const db = require('./config/db');
 
+// El estado del juego ya no necesita la lista de jugadores, solo el estado de la partida.
 let gameState = {
   isActive: false,
   currentQuestion: null,
@@ -17,66 +18,68 @@ function initSocket(server) {
   const admin_nsp = io.of("/admin");
   const projection_nsp = io.of("/projection");
 
+  // --- LÓGICA DE JUGADORES CON DB PERSISTENTE ---
   players_nsp.on('connection', (socket) => {
     console.log(`[+] Jugador conectado: ${socket.id}`);
     
     socket.on('player:join', async ({ name }) => {
       try {
-        await db.query(
-          'INSERT INTO players (name, socket_id, score) VALUES ($1, $2, 0) ON CONFLICT (socket_id) DO UPDATE SET name = $1, score = 0', 
-          [name, socket.id]
-        );
-        console.log(`[>] Jugador ${name} (${socket.id}) guardado/actualizado.`);
+        // 1. Buscamos si el jugador ya existe por su nombre.
+        const existingPlayer = await getPlayerByName(name);
+
+        if (existingPlayer) {
+          // 2a. Si existe, actualizamos su socket_id para esta nueva conexión.
+          await db.query('UPDATE players SET socket_id = $1 WHERE id = $2', [socket.id, existingPlayer.id]);
+          console.log(`[>] Jugador recurrente '${name}' ha vuelto.`);
+        } else {
+          // 2b. Si no existe, lo creamos en la base de datos.
+          await db.query('INSERT INTO players (name, socket_id, score) VALUES ($1, $2, 0)', [name, socket.id]);
+          console.log(`[>] Jugador nuevo '${name}' ha sido creado.`);
+        }
         broadcastRanking();
       } catch (err) { console.error("Error al unir jugador:", err); }
     });
 
     socket.on('player:submit_answer', async ({ questionId, answerId }) => {
       if (!gameState.isActive || !gameState.currentQuestion || gameState.currentQuestion.id != questionId) return;
-
+      
       const player = await getPlayerBySocketId(socket.id);
       const question = gameState.currentQuestion;
       
-      if (player && question) {
-        // --- ESTA ES LA CORRECCIÓN CLAVE ---
-        // Convertimos ambas partes a número con parseInt() antes de comparar
-        // para evitar errores de tipo (ej. comparar el número 1 con el texto '1').
-        if (parseInt(question.correct_option) === parseInt(answerId)) {
-          try {
-            const points = parseInt(question.points) || 10;
-            await db.query('UPDATE players SET score = score + $1 WHERE id = $2', [points, player.id]);
-            console.log(`[CORRECTO] +${points} puntos para ${player.name}.`);
-            broadcastRanking();
-          } catch (err) { console.error("Error al actualizar puntaje:", err); }
-        } else {
-            console.log(`[INCORRECTO] Respuesta de ${player.name} no es correcta.`);
-        }
+      if (player && question && parseInt(question.correct_option) === parseInt(answerId)) {
+        try {
+          const points = parseInt(question.points) || 10;
+          // El puntaje ahora se acumula sobre el que ya tenía.
+          await db.query('UPDATE players SET score = score + $1 WHERE id = $2', [points, player.id]);
+          console.log(`[CORRECTO] +${points} puntos para ${player.name}.`);
+          broadcastRanking();
+        } catch (err) { console.error("Error al actualizar puntaje:", err); }
       }
     });
 
     socket.on('ranking:get', () => { broadcastRanking(socket); });
 
     socket.on('disconnect', async () => {
+      console.log(`[-] Jugador desconectado: ${socket.id}`);
+      // Ya no borramos al jugador. Su puntaje es histórico.
+      // Opcionalmente, podríamos limpiar su socket_id para indicar que está offline.
       try {
-        await db.query('DELETE FROM players WHERE socket_id = $1', [socket.id]);
-        console.log(`[-] Jugador desconectado: ${socket.id} eliminado.`);
-        broadcastRanking();
-      } catch (err) { console.error("Error al eliminar jugador:", err); }
+        await db.query('UPDATE players SET socket_id = NULL WHERE socket_id = $1', [socket.id]);
+      } catch(err) { console.error("Error al limpiar socket_id en desconexión:", err); }
     });
   });
 
+  // --- LÓGICA DE ADMIN CON RANKING PERSISTENTE ---
   admin_nsp.on('connection', (socket) => {
-    socket.on('admin:start_game', async () => {
+    socket.on('admin:start_game', () => {
       console.log('--- JUEGO INICIADO ---');
-      try {
-        await db.query('TRUNCATE TABLE players RESTART IDENTITY;');
-        gameState.isActive = true;
-        gameState.currentQuestion = null;
-        
-        const namespaces = [players_nsp, projection_nsp];
-        namespaces.forEach(nsp => nsp.emit('server:game_started'));
-        broadcastRanking();
-      } catch (err) { console.error("Error al iniciar juego:", err); }
+      // YA NO BORRAMOS LA TABLA. Solo activamos el estado de la partida.
+      // El ranking histórico se mantiene.
+      gameState.isActive = true;
+      gameState.currentQuestion = null;
+      
+      const namespaces = [players_nsp, projection_nsp];
+      namespaces.forEach(nsp => nsp.emit('server:game_started'));
     });
 
     socket.on('admin:end_game', async () => {
@@ -97,9 +100,19 @@ function initSocket(server) {
     });
   });
 
+  // --- FUNCIONES AUXILIARES PARA LA DB ---
+  async function getPlayerByName(name) {
+    try {
+        const { rows } = await db.query('SELECT * FROM players WHERE name = $1 LIMIT 1', [name]);
+        return rows[0];
+    } catch (err) { return null; }
+  }
+
   async function getPlayerBySocketId(socketId) {
-      const { rows } = await db.query('SELECT * FROM players WHERE socket_id = $1', [socketId]);
-      return rows[0];
+    try {
+        const { rows } = await db.query('SELECT * FROM players WHERE socket_id = $1 LIMIT 1', [socketId]);
+        return rows[0];
+    } catch (err) { return null; }
   }
 
   async function getRanking() {
@@ -118,7 +131,7 @@ function initSocket(server) {
     target.emit('server:update_ranking', ranking);
   }
 
-  console.log('Socket.IO del Servidor inicializado con lógica de puntaje corregida.');
+  console.log('Socket.IO del Servidor inicializado con LÓGICA DE RANKING HISTÓRICO.');
   return io;
 }
 
