@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import io from 'socket.io-client';
 
-// --- Estilos Finales ---
+// --- Estilos Finales y Pulidos ---
 const styles = {
   // Contenedor base que ocupa toda la pantalla
   baseContainer: {
@@ -11,6 +11,7 @@ const styles = {
     color: 'white',
     fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif',
     textAlign: 'center',
+    overflow: 'hidden', // Evita barras de scroll
   },
   // Estilos para la vista de pregunta
   questionView: {
@@ -19,6 +20,8 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
+    padding: '20px',
+    boxSizing: 'border-box'
   },
   video: {
     width: '80%',
@@ -28,13 +31,13 @@ const styles = {
     backgroundColor: '#111'
   },
   questionText: {
-    fontSize: 'clamp(1.5em, 5vw, 3em)', // Tamaño de fuente adaptable
+    fontSize: 'clamp(1.5em, 5vw, 3.5em)', // Tamaño de fuente adaptable
     margin: '20px 0',
     textShadow: '2px 2px 4px #000'
   },
   optionsContainer: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
     gap: '20px',
     width: '80%',
   },
@@ -47,7 +50,7 @@ const styles = {
     transition: 'all 0.3s ease'
   },
   correctOption: {
-    backgroundColor: '#28a745', // Un verde más vibrante
+    backgroundColor: '#28a745',
     borderColor: '#90ee90',
     transform: 'scale(1.05)',
     boxShadow: '0 0 15px lightgreen',
@@ -56,21 +59,22 @@ const styles = {
   waitingContainer: {
     width: '100%',
     height: '100%',
-    backgroundSize: 'cover', // <-- Esto hace que la imagen cubra todo el espacio
+    backgroundSize: 'cover',
     backgroundPosition: 'center center',
     backgroundRepeat: 'no-repeat',
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'flex-end', // Alinea el banner abajo
+    justifyContent: 'flex-end', // Empuja el banner hacia abajo
     alignItems: 'center',
   },
   waitingBanner: {
     width: '100%',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    padding: '20px 0',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    padding: '20px 40px',
+    boxSizing: 'border-box',
   },
   waitingText: {
-    fontSize: 'clamp(1.5em, 4vw, 2.5em)',
+    fontSize: 'clamp(2em, 5vw, 3.5em)',
     fontWeight: 'bold',
     textShadow: '3px 3px 6px #000',
     margin: 0,
@@ -83,7 +87,7 @@ export default function ProjectionPage() {
   const [settings, setSettings] = useState(null);
   const videoRef = useRef(null);
 
-  // EFECTO 1: Carga configuración y conecta al socket
+  // EFECTO 1: Carga la configuración y establece la conexión del socket
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -118,14 +122,16 @@ export default function ProjectionPage() {
       }
     };
     
+    // Limpiamos listeners anteriores para evitar duplicados
     video.removeEventListener('timeupdate', timeUpdateListener);
 
     if (question && !revealedAnswer) {
       if (question.video_url && question.video_url.trim() !== '') {
+        const handleCanPlay = () => video.play().catch(e => console.error("Error de Autoplay:", e));
+        video.addEventListener('canplay', handleCanPlay, { once: true });
+        video.addEventListener('timeupdate', timeUpdateListener);
         video.src = question.video_url;
         video.load();
-        video.play().catch(e => console.error("Error de Autoplay:", e));
-        video.addEventListener('timeupdate', timeUpdateListener);
       }
     } else if (question && revealedAnswer) {
       video.play().catch(e => console.error("Error al reanudar:", e));
@@ -134,15 +140,16 @@ export default function ProjectionPage() {
     return () => { video.removeEventListener('timeupdate', timeUpdateListener); };
   }, [question, revealedAnswer]);
 
+  
   // --- LÓGICA DE RENDERIZADO FINAL ---
 
+  // Si hay una pregunta, mostramos la vista del juego
   if (question) {
     const options = [question.option_1, question.option_2, question.option_3, question.option_4];
     return (
       <div style={{...styles.baseContainer, ...styles.questionView}}>
         <video key={question.id} ref={videoRef} style={styles.video} muted playsInline>
           <source src={question.video_url} type="video/mp4" />
-          Tu navegador no soporta videos.
         </video>
         <h1 style={styles.questionText}>{question.question_text}</h1>
         <div style={styles.optionsContainer}>
@@ -158,11 +165,13 @@ export default function ProjectionPage() {
 
   // Si no hay pregunta, mostramos la pantalla de espera personalizada
   return (
-    <div style={{ ...styles.baseContainer, ...styles.waitingContainer, backgroundImage: `url(${settings?.projection_background_url || ''})` }}>
-      <div style={styles.waitingBanner}>
-        <h1 style={styles.waitingText}>
-          Esperando que el administrador inicie el juego...
-        </h1>
+    <div style={styles.baseContainer}>
+      <div style={{ ...styles.waitingContainer, backgroundImage: `url(${settings?.projection_background_url || ''})` }}>
+        <div style={styles.waitingBanner}>
+          <h1 style={styles.waitingText}>
+            Esperando que el administrador inicie el juego...
+          </h1>
+        </div>
       </div>
     </div>
   );
