@@ -1,7 +1,6 @@
 const { Server } = require('socket.io');
 const db = require('./config/db');
 
-// El estado del juego en memoria. Solo controla el estado de la partida, no los datos de jugadores.
 let gameState = {
   isActive: false,
   currentQuestion: null,
@@ -12,17 +11,13 @@ let io;
 
 function initSocket(server) {
   io = new Server(server, {
-    cors: { 
-      origin: [process.env.FRONTEND_URL, process.env.ADMIN_URL],
-      methods: ["GET", "POST"]
-    }
+    cors: { origin: [process.env.FRONTEND_URL, process.env.ADMIN_URL] }
   });
 
   const players_nsp = io.of("/players");
   const admin_nsp = io.of("/admin");
   const projection_nsp = io.of("/projection");
 
-  // --- Lógica para Conexiones de Jugadores ---
   players_nsp.on('connection', (socket) => {
     console.log(`[+] Jugador conectado: ${socket.id}`);
     
@@ -30,34 +25,24 @@ function initSocket(server) {
       try {
         const existingPlayer = await getPlayerByName(name);
         if (existingPlayer) {
-          // Si el jugador ya existe, actualizamos su socket_id para esta nueva conexión.
           await db.query('UPDATE players SET socket_id = $1 WHERE id = $2', [socket.id, existingPlayer.id]);
-          console.log(`[>] Jugador recurrente '${name}' ha vuelto a conectarse.`);
         } else {
-          // Si es un jugador nuevo, lo creamos en la base de datos.
           await db.query('INSERT INTO players (name, socket_id, score) VALUES ($1, $2, 0)', [name, socket.id]);
-          console.log(`[>] Jugador nuevo '${name}' ha sido creado.`);
         }
         broadcastRanking();
-      } catch (err) { console.error("Error en player:join:", err); }
+      } catch (err) { console.error("Error al unir jugador:", err); }
     });
 
     socket.on('player:submit_answer', async ({ questionId, answerId }) => {
       if (!gameState.isActive || !gameState.currentQuestion || gameState.currentQuestion.id != questionId) return;
-      
       const player = await getPlayerBySocketId(socket.id);
       const question = gameState.currentQuestion;
-      
-      if (player && question) {
-        // Comparamos las respuestas como números para evitar errores de tipo.
-        if (parseInt(question.correct_option) === parseInt(answerId)) {
-          try {
-            const points = parseInt(question.points) || 10;
-            await db.query('UPDATE players SET score = score + $1 WHERE id = $2', [points, player.id]);
-            console.log(`[CORRECTO] +${points} puntos para ${player.name}.`);
-            broadcastRanking(); // Actualizamos el ranking para todos
-          } catch (err) { console.error("Error al actualizar puntaje:", err); }
-        }
+      if (player && question && parseInt(question.correct_option) === parseInt(answerId)) {
+        try {
+          const points = parseInt(question.points) || 10;
+          await db.query('UPDATE players SET score = score + $1 WHERE id = $2', [points, player.id]);
+          broadcastRanking();
+        } catch (err) { console.error("Error al actualizar puntaje:", err); }
       }
     });
 
@@ -66,24 +51,18 @@ function initSocket(server) {
     socket.on('disconnect', async () => {
       console.log(`[-] Jugador desconectado: ${socket.id}`);
       try {
-        // Al desconectarse, marcamos al jugador como offline (socket_id = NULL),
-        // pero NO borramos su registro ni su puntaje.
         await db.query('UPDATE players SET socket_id = NULL WHERE socket_id = $1', [socket.id]);
       } catch(err) { console.error("Error al limpiar socket_id en desconexión:", err); }
     });
   });
 
-  // --- Lógica para Conexiones del Administrador ---
   admin_nsp.on('connection', (socket) => {
-    console.log(`[ADMIN] Admin conectado: ${socket.id}`);
-    
     socket.on('admin:start_game', async () => {
       console.log('--- JUEGO INICIADO ---');
       try {
         if (gameState.questionTimer) clearTimeout(gameState.questionTimer);
-        // Para el ranking histórico, NO borramos la tabla.
-        // Si se quisiera un reinicio total, aquí iría el TRUNCATE.
-        // Por ahora, solo activamos la partida.
+        // Descomenta la siguiente línea si quieres que el ranking histórico se borre al iniciar un nuevo juego
+        // await db.query('TRUNCATE TABLE players RESTART IDENTITY;');
         gameState.isActive = true;
         gameState.currentQuestion = null;
         
@@ -108,21 +87,29 @@ function initSocket(server) {
         if (gameState.questionTimer) clearTimeout(gameState.questionTimer);
 
         gameState.currentQuestion = question;
+        
         const namespaces = [players_nsp, projection_nsp];
         namespaces.forEach(nsp => nsp.emit('server:new_question', question));
         console.log(`[PREGUNTA] Enviada: ${question.question_text}`);
 
+        // --- LÓGICA DEL TEMPORIZADOR Y REVELACIÓN ---
         const timeLimit = (parseInt(question.time_limit_secs) || 15) * 1000;
         gameState.questionTimer = setTimeout(() => {
-            console.log(`[TIEMPO] Fin del tiempo para la pregunta ${question.id}`);
+            console.log(`[TIEMPO] Fin del tiempo para la pregunta ${question.id}. Revelando respuesta.`);
+            
+            // Avisamos a los jugadores que el tiempo se acabó
             players_nsp.emit('server:time_up');
-            projection_nsp.emit('server:reveal_answer', { correctOption: question.correct_option });
+
+            // Enviamos la revelación a la pantalla de proyección
+            projection_nsp.emit('server:reveal_answer', { 
+                correctOption: question.correct_option 
+            });
+
             gameState.currentQuestion = null;
         }, timeLimit);
     });
   });
 
-  // --- FUNCIONES AUXILIARES PARA LA BASE DE DATOS ---
   async function getPlayerByName(name) {
     try {
         const { rows } = await db.query('SELECT * FROM players WHERE name = $1 LIMIT 1', [name]);
@@ -139,7 +126,6 @@ function initSocket(server) {
 
   async function getRanking() {
     try {
-      // Incluimos socket_id para que el frontend pueda identificar al jugador actual
       const { rows } = await db.query('SELECT id, name, score, socket_id FROM players ORDER BY score DESC, name ASC LIMIT 10');
       return rows;
     } catch (err) {
@@ -154,7 +140,7 @@ function initSocket(server) {
     target.emit('server:update_ranking', ranking);
   }
 
-  console.log('Socket.IO del Servidor inicializado con Ranking Histórico y Persistente.');
+  console.log('Socket.IO del Servidor inicializado con toda la lógica final.');
   return io;
 }
 
