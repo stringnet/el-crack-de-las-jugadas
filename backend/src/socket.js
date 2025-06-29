@@ -117,7 +117,7 @@ function initSocket(server) {
 
   async function getRanking() {
     try {
-      const { rows } = await db.query('SELECT id, name, score FROM players ORDER BY score DESC, name ASC LIMIT 10');
+      const { rows } = await db.query('SELECT id, name, score, socket_id FROM players ORDER BY score DESC, name ASC LIMIT 10');
       return rows;
     } catch (err) {
       console.error("Error al obtener ranking:", err);
