@@ -1,7 +1,8 @@
 // admin-panel/pages/configuracion.js
 import { useState, useEffect } from 'react';
+import withAuth from '../components/withAuth'; // <-- 1. Importamos el guardia
 
-export default function ConfiguracionPage() {
+function ConfiguracionPage() {
     // Estado para guardar los valores de los campos del formulario
     const [settings, setSettings] = useState({
         logo_url: '',
@@ -117,3 +118,4 @@ export default function ConfiguracionPage() {
         </div>
     );
 }
+export default withAuth(ConfiguracionPage); // <-- 2. Envolvemos la página al exportarla
