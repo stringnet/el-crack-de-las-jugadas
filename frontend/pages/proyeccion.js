@@ -1,37 +1,78 @@
 import { useEffect, useState, useRef } from 'react';
 import io from 'socket.io-client';
 
-// --- Estilos para la página ---
+// --- Estilos Finales ---
 const styles = {
-  // Contenedor principal que se adapta a las dos vistas
-  container: { position: 'relative', width: '100vw', height: '100vh', backgroundColor: 'black', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial, sans-serif', textAlign: 'center' },
-  // Estilos para la vista de video y pregunta
-  video: { width: '80%', maxHeight: '60vh', border: '4px solid white', borderRadius: '10px', backgroundColor: '#111' },
-  questionText: { fontSize: '3em', margin: '20px 0', textShadow: '2px 2px 4px #000' },
-  optionsContainer: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', width: '80%' },
-  option: { backgroundColor: '#333', padding: '20px', borderRadius: '10px', fontSize: '1.8em', border: '2px solid #555', transition: 'all 0.3s ease' },
-  correctOption: { backgroundColor: 'green', borderColor: 'lightgreen', transform: 'scale(1.05)' },
-  // Estilos para la pantalla de espera personalizada
+  // Contenedor base que ocupa toda la pantalla
+  baseContainer: {
+    width: '100vw',
+    height: '100vh',
+    backgroundColor: 'black',
+    color: 'white',
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif',
+    textAlign: 'center',
+  },
+  // Estilos para la vista de pregunta
+  questionView: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+  },
+  video: {
+    width: '80%',
+    maxHeight: '60vh',
+    border: '4px solid white',
+    borderRadius: '10px',
+    backgroundColor: '#111'
+  },
+  questionText: {
+    fontSize: 'clamp(1.5em, 5vw, 3em)', // Tamaño de fuente adaptable
+    margin: '20px 0',
+    textShadow: '2px 2px 4px #000'
+  },
+  optionsContainer: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '20px',
+    width: '80%',
+  },
+  option: {
+    backgroundColor: '#333',
+    padding: '20px',
+    borderRadius: '10px',
+    fontSize: 'clamp(1em, 3vw, 1.8em)',
+    border: '2px solid #555',
+    transition: 'all 0.3s ease'
+  },
+  correctOption: {
+    backgroundColor: '#28a745', // Un verde más vibrante
+    borderColor: '#90ee90',
+    transform: 'scale(1.05)',
+    boxShadow: '0 0 15px lightgreen',
+  },
+  // Estilos para la pantalla de espera
   waitingContainer: {
     width: '100%',
     height: '100%',
-    backgroundSize: 'cover',
+    backgroundSize: 'cover', // <-- Esto hace que la imagen cubra todo el espacio
     backgroundPosition: 'center center',
     backgroundRepeat: 'no-repeat',
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-end', // Alinea el banner abajo
     alignItems: 'center',
   },
   waitingBanner: {
     width: '100%',
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    color: 'white',
     padding: '20px 0',
   },
   waitingText: {
-    fontSize: '2.5em',
-    textShadow: '2px 2px 4px #000',
+    fontSize: 'clamp(1.5em, 4vw, 2.5em)',
+    fontWeight: 'bold',
+    textShadow: '3px 3px 6px #000',
     margin: 0,
   }
 };
@@ -39,12 +80,11 @@ const styles = {
 export default function ProjectionPage() {
   const [question, setQuestion] = useState(null);
   const [revealedAnswer, setRevealedAnswer] = useState(null);
-  const [settings, setSettings] = useState(null); // Inicia como null para saber si ya cargó
+  const [settings, setSettings] = useState(null);
   const videoRef = useRef(null);
 
-  // EFECTO 1: Carga la configuración y establece la conexión del socket
+  // EFECTO 1: Carga configuración y conecta al socket
   useEffect(() => {
-    // Carga la configuración del juego al iniciar
     const fetchSettings = async () => {
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/settings`);
@@ -53,18 +93,11 @@ export default function ProjectionPage() {
     };
     fetchSettings();
 
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    const socket = io(`${backendUrl}/projection`);
+    const socket = io(`${process.env.NEXT_PUBLIC_BACKEND_URL}/projection`);
     
-    const handleNewQuestion = (newQuestion) => {
-      setRevealedAnswer(null);
-      setQuestion(newQuestion);
-    };
+    const handleNewQuestion = (newQuestion) => { setRevealedAnswer(null); setQuestion(newQuestion); };
     const handleRevealAnswer = ({ correctOption }) => setRevealedAnswer(correctOption);
-    const resetScreen = () => {
-      setQuestion(null);
-      setRevealedAnswer(null);
-    };
+    const resetScreen = () => { setQuestion(null); setRevealedAnswer(null); };
     
     socket.on('server:new_question', handleNewQuestion);
     socket.on('server:reveal_answer', handleRevealAnswer);
@@ -74,7 +107,7 @@ export default function ProjectionPage() {
     return () => { socket.disconnect(); };
   }, []);
 
-  // EFECTO 2: Gestiona toda la lógica del video cuando 'question' o 'revealedAnswer' cambian
+  // EFECTO 2: Gestiona el video cuando cambia la pregunta o se revela la respuesta
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -88,32 +121,27 @@ export default function ProjectionPage() {
     video.removeEventListener('timeupdate', timeUpdateListener);
 
     if (question && !revealedAnswer) {
-      // FASE 1: Nueva pregunta
-      if (question.video_url) {
+      if (question.video_url && question.video_url.trim() !== '') {
         video.src = question.video_url;
         video.load();
         video.play().catch(e => console.error("Error de Autoplay:", e));
         video.addEventListener('timeupdate', timeUpdateListener);
       }
     } else if (question && revealedAnswer) {
-      // FASE 2: Revelar respuesta
       video.play().catch(e => console.error("Error al reanudar:", e));
     }
-
-    return () => {
-      video.removeEventListener('timeupdate', timeUpdateListener);
-    }
+    
+    return () => { video.removeEventListener('timeupdate', timeUpdateListener); };
   }, [question, revealedAnswer]);
 
-  // --- LÓGICA DE RENDERIZADO ---
-  
-  // Si hay una pregunta activa, mostramos la vista del juego
+  // --- LÓGICA DE RENDERIZADO FINAL ---
+
   if (question) {
     const options = [question.option_1, question.option_2, question.option_3, question.option_4];
     return (
-      <div style={styles.container}>
+      <div style={{...styles.baseContainer, ...styles.questionView}}>
         <video key={question.id} ref={videoRef} style={styles.video} muted playsInline>
-          {question.video_url && <source src={question.video_url} type="video/mp4" />}
+          <source src={question.video_url} type="video/mp4" />
           Tu navegador no soporta videos.
         </video>
         <h1 style={styles.questionText}>{question.question_text}</h1>
@@ -130,7 +158,7 @@ export default function ProjectionPage() {
 
   // Si no hay pregunta, mostramos la pantalla de espera personalizada
   return (
-    <div style={{ ...styles.waitingContainer, backgroundImage: `url(${settings?.projection_background_url || ''})` }}>
+    <div style={{ ...styles.baseContainer, ...styles.waitingContainer, backgroundImage: `url(${settings?.projection_background_url || ''})` }}>
       <div style={styles.waitingBanner}>
         <h1 style={styles.waitingText}>
           Esperando que el administrador inicie el juego...
