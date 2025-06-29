@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const apiRoutes = require('./api/routes'); // Importamos nuestras rutas
+const path = require('path'); // Importamos el módulo 'path' de Node.js
 
 const app = express();
 const server = http.createServer(app);
@@ -15,6 +16,11 @@ app.use(cors(corsOptions));
 
 // Middleware para que Express entienda peticiones con cuerpo en formato JSON
 app.use(express.json());
+
+// --- LÍNEA NUEVA ---
+// Hacemos que la carpeta /public/uploads sea accesible desde la web en la ruta /uploads
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
+// --------------------
 
 // Ruta principal de prueba
 app.get('/', (req, res) => {
