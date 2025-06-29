@@ -1,18 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const gameController = require('./controllers/gameController');
-const uploadController = require('./controllers/uploadController'); // <-- Importamos el nuevo controlador
+const uploadController = require('./controllers/uploadController');
 
-// --- Rutas para la gestión de Preguntas ---
+// Rutas para Preguntas (CRUD Completo)
 router.get('/questions', gameController.getQuestions);
 router.post('/questions', gameController.createQuestion);
+router.put('/questions/:id', gameController.updateQuestion);    // <-- NUEVA RUTA
+router.delete('/questions/:id', gameController.deleteQuestion); // <-- NUEVA RUTA
 
-// --- Rutas para la Personalización del Juego ---
+// Rutas para Configuración
 router.get('/settings', gameController.getGameSettings);
-router.post('/settings', gameController.updateGameSettings); // <-- Esta es la ruta clave que faltaba
+router.post('/settings', gameController.updateGameSettings);
 
-// --- NUEVA RUTA PARA SUBIR VIDEOS ---
-// Usamos el 'middleware' de multer para procesar el archivo antes de llegar a nuestro controlador
+// Ruta para Subida de Videos
 router.post('/upload', uploadController.upload.single('video'), uploadController.handleUpload);
 
 module.exports = router;
