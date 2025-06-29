@@ -1,66 +1,56 @@
 import { useState, useEffect } from 'react';
-import io from 'socket.io-client';
-
-// La conexión a socket.io se mantiene igual
-let socket; // Lo definimos fuera para que no se reinicie en cada render
+import { getAdminSocket } from '../lib/socket'; // <-- Importamos nuestro nuevo gestor
 
 export default function AdminDashboard() {
   const [questions, setQuestions] = useState([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState('');
-  const [status, setStatus] = useState('Inicializando...');
+  const [socket, setSocket] = useState(null);
 
-  // Este efecto se ejecuta una sola vez al cargar la página
   useEffect(() => {
-    // Inicializamos la conexión del socket
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    socket = io(`${backendUrl}/admin`);
+    // Obtenemos la instancia del socket y la guardamos en el estado
+    const adminSocket = getAdminSocket();
+    setSocket(adminSocket);
 
-    // Función para cargar las preguntas desde la API
+    // Listener para recibir feedback del servidor
+    adminSocket.on('admin:feedback', (data) => {
+      alert(`Mensaje del Servidor: ${data.message}`);
+    });
+
+    // Cargar las preguntas disponibles desde la API
     const fetchQuestions = async () => {
-        setStatus('Cargando preguntas...');
-        try {
-            // --- ESTA ES LA PARTE CLAVE - AHORA LLAMA A LA API REAL ---
-            const res = await fetch(`${backendUrl}/api/questions`);
-            if (res.ok) {
-                const data = await res.json();
-                setQuestions(data);
-                // Si hay preguntas, seleccionamos la primera por defecto
-                if (data.length > 0) {
-                    setSelectedQuestionId(data[0].id);
-                }
-                setStatus(''); // Limpiamos el estado si todo va bien
-            } else {
-                setStatus('Error al cargar las preguntas.');
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/questions`);
+        if (res.ok) {
+            const data = await res.json();
+            setQuestions(data);
+            if (data.length > 0) {
+                setSelectedQuestionId(data[0].id);
             }
-        } catch (err) {
-            setStatus('Error de red al cargar preguntas.');
-            console.error(err);
         }
+      } catch (err) { console.error(err); }
     };
-
     fetchQuestions();
 
-    // Limpiamos la conexión del socket cuando el componente se desmonte
     return () => {
-        if(socket) socket.disconnect();
+      adminSocket.off('admin:feedback');
     }
   }, []);
 
-  // Función para enviar la pregunta seleccionada a través de sockets
   const sendQuestion = () => {
-    if (!socket) {
-        alert("El socket no está conectado.");
-        return;
-    }
-    // Buscamos el objeto completo de la pregunta seleccionada en nuestro estado
+    if (!socket) return;
     const questionToSend = questions.find(q => q.id == selectedQuestionId);
     if (questionToSend) {
       socket.emit('admin:next_question', questionToSend);
-      alert(`Pregunta "${questionToSend.question_text}" enviada a las pantallas.`);
-    } else {
-      alert("Por favor, selecciona una pregunta válida.");
     }
   };
+
+  const startGame = () => {
+    if (socket) socket.emit('admin:start_game');
+  }
+
+  const endGame = () => {
+    if (socket) socket.emit('admin:end_game');
+  }
   
   return (
     <div>
@@ -76,29 +66,23 @@ export default function AdminDashboard() {
               style={{ padding: '10px', minWidth: '300px', fontSize: '1rem' }}
             >
               {questions.map(q => (
-                <option key={q.id} value={q.id}>
-                  ({q.id}) {q.question_text}
-                </option>
+                <option key={q.id} value={q.id}>({q.id}) {q.question_text}</option>
               ))}
             </select>
-            <button 
-              onClick={sendQuestion} 
-              style={{ padding: '10px 20px', marginLeft: '10px', fontSize: '1rem' }}
-            >
-              Enviar Siguiente Pregunta
+            <button onClick={sendQuestion} style={{ padding: '10px 20px', marginLeft: '10px', fontSize: '1rem' }}>
+              Enviar Pregunta
             </button>
           </>
-        ) : (
-          <p>{status || "No hay preguntas disponibles. Créalas en la pestaña 'Preguntas'."}</p>
-        )}
+        ) : <p>No hay preguntas disponibles.</p>}
       </div>
 
        <div style={{ background: '#fee', padding: '20px', borderRadius: '8px' }}>
         <h2>Control General del Juego</h2>
-        <button onClick={() => socket.emit('admin:start_game')} style={{ padding: '10px 20px', fontSize: '1rem' }}>
-          Iniciar Juego
+        {/* Los botones ahora llaman a nuestras nuevas funciones */}
+        <button onClick={startGame} style={{ padding: '10px 20px', fontSize: '1rem' }}>
+          Iniciar Juego (Reiniciar)
         </button>
-        <button onClick={() => socket.emit('admin:end_game')} style={{ padding: '10px 20px', marginLeft: '10px', fontSize: '1rem' }}>
+        <button onClick={endGame} style={{ padding: '10px 20px', marginLeft: '10px', fontSize: '1rem' }}>
           Finalizar Juego
         </button>
       </div>
