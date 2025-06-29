@@ -1,12 +1,40 @@
 const db = require('../../config/db');
 
-// OBTENER todas las preguntas (sin cambios)
-const getQuestions = async (req, res) => { /* ...código existente... */ };
+/**
+ * Obtiene todas las preguntas de la base de datos.
+ */
+const getQuestions = async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT * FROM questions ORDER BY id ASC');
+    res.json(rows);
+  } catch (err) {
+    console.error("Error en getQuestions:", err.message);
+    res.status(500).send('Error en el servidor');
+  }
+};
 
-// CREAR una nueva pregunta (sin cambios)
-const createQuestion = async (req, res) => { /* ...código existente... */ };
+/**
+ * Crea una nueva pregunta en la base de datos.
+ */
+const createQuestion = async (req, res) => {
+  try {
+    const { question_text, video_url, pause_timestamp_secs, points, time_limit_secs, option_1, option_2, option_3, option_4, correct_option } = req.body;
+    
+    const newQuestion = await db.query(
+      "INSERT INTO questions (question_text, video_url, pause_timestamp_secs, points, time_limit_secs, option_1, option_2, option_3, option_4, correct_option) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *",
+      [question_text, video_url, pause_timestamp_secs, points, time_limit_secs, option_1, option_2, option_3, option_4, correct_option]
+    );
+    
+    res.status(201).json(newQuestion.rows[0]);
+  } catch (err) {
+    console.error("Error en createQuestion:", err.message);
+    res.status(500).send('Error en el servidor');
+  }
+};
 
-// --- NUEVA FUNCIÓN PARA ACTUALIZAR (EDITAR) ---
+/**
+ * Actualiza (edita) una pregunta existente.
+ */
 const updateQuestion = async (req, res) => {
   try {
     const { id } = req.params; // Obtenemos el ID de la URL
@@ -27,7 +55,9 @@ const updateQuestion = async (req, res) => {
   }
 };
 
-// --- NUEVA FUNCIÓN PARA BORRAR ---
+/**
+ * Borra una pregunta existente.
+ */
 const deleteQuestion = async (req, res) => {
   try {
     const { id } = req.params; // Obtenemos el ID de la URL
@@ -44,13 +74,51 @@ const deleteQuestion = async (req, res) => {
   }
 };
 
-// ... (getGameSettings y updateGameSettings se quedan igual) ...
+/**
+ * Obtiene todas las configuraciones del juego.
+ */
+const getGameSettings = async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT * FROM gamesettings');
+    const settings = rows.reduce((acc, row) => {
+      acc[row.setting_key] = row.setting_value;
+      return acc;
+    }, {});
+    res.json(settings);
+  } catch (err) {
+    console.error("Error en getGameSettings:", err.message);
+    res.status(500).send('Error en el servidor');
+  }
+};
 
+/**
+ * Actualiza las configuraciones del juego.
+ */
+const updateGameSettings = async (req, res) => {
+  try {
+    const settings = req.body;
+    for (const key in settings) {
+      if (Object.hasOwnProperty.call(settings, key)) {
+        const value = settings[key];
+        await db.query(
+          'INSERT INTO gamesettings (setting_key, setting_value) VALUES ($1, $2) ON CONFLICT (setting_key) DO UPDATE SET setting_value = $2',
+          [key, value]
+        );
+      }
+    }
+    res.status(200).json({ message: 'Configuración guardada exitosamente' });
+  } catch (err) {
+    console.error("Error en updateGameSettings:", err.message);
+    res.status(500).send('Error en el servidor');
+  }
+};
+
+// Exportamos TODAS las funciones que nuestro enrutador necesita.
 module.exports = {
   getQuestions,
   createQuestion,
-  updateQuestion, // <-- Añadimos la nueva función
-  deleteQuestion, // <-- Añadimos la nueva función
+  updateQuestion,
+  deleteQuestion,
   getGameSettings,
   updateGameSettings
 };
