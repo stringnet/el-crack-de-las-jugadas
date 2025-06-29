@@ -76,18 +76,7 @@ export default function ProjectionPage() {
 
   return (
     <div style={styles.container}>
-      {/* --- NUESTRO MONITOR DE ESTADO --- */}
-      <div style={styles.debugMonitor}>
-        <h3>Monitor de Estado</h3>
-        <pre>
-          Game State: {gameState}
-          <br />
-          Question: {question ? `ID ${question.id}` : 'null'}
-          <br />
-          Revealed: {revealedAnswer || 'null'}
-        </pre>
-      </div>
-
+      
       {/* El resto de la lógica de renderizado se queda igual */}
       {gameState === 'showing_question' && question ? (
         <>
