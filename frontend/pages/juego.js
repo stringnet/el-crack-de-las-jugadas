@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { getSocket } from '../lib/socket'; // Importamos nuestro gestor de socket
+import { getPlayerSocket } from '../lib/socket'; // Importamos nuestro gestor de socket
 import Timer from '../components/Timer';
 import AnswerOptions from '../components/AnswerOptions';
 
@@ -24,7 +24,7 @@ export default function GamePage() {
     setPlayerName(name);
 
     // Obtenemos la instancia única del socket
-    const socket = getSocket();
+    const socket = getPlayerSocket();
 
     // --- Definimos los manejadores de eventos del socket ---
 
