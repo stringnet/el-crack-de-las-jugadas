@@ -7,32 +7,27 @@ const styles = {
   questionText: { fontSize: '3em', margin: '20px 0', textShadow: '2px 2px 4px #000' },
   optionsContainer: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', width: '80%' },
   option: { backgroundColor: '#333', padding: '20px', borderRadius: '10px', fontSize: '1.8em', border: '2px solid #555', transition: 'all 0.3s ease' },
-  correctOption: { backgroundColor: 'green', borderColor: 'lightgreen', transform: 'scale(1.05)' },
-  // --- Estilos para nuestro nuevo monitor de estado ---
-  debugMonitor: { position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(0,0,0,0.7)', color: 'lightgreen', padding: '10px', fontSize: '12px', zIndex: 9999, border: '1px solid lightgreen', fontFamily: 'monospace' }
+  correctOption: { backgroundColor: 'green', borderColor: 'lightgreen', transform: 'scale(1.05)' }
 };
 
 export default function ProjectionPage() {
-  const [gameState, setGameState] = useState('waiting');
   const [question, setQuestion] = useState(null);
   const [revealedAnswer, setRevealedAnswer] = useState(null);
   const videoRef = useRef(null);
 
-  // --- EFECTO 1: MANEJO DE EVENTOS DE SOCKET ---
   useEffect(() => {
     const socket = getSocket();
 
     const handleNewQuestion = (newQuestion) => {
       setRevealedAnswer(null);
       setQuestion(newQuestion);
-      setGameState('showing_question');
     };
     const handleRevealAnswer = ({ correctOption }) => {
       setRevealedAnswer(correctOption);
     };
     const resetScreen = () => {
-      setGameState('waiting');
       setQuestion(null);
+      setRevealedAnswer(null);
     }
     
     socket.on('server:new_question', handleNewQuestion);
@@ -48,55 +43,66 @@ export default function ProjectionPage() {
     };
   }, []);
 
-  // --- EFECTO 2: MANEJO DEL VIDEO ---
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !question) return;
 
     video.src = question.video_url;
     video.load();
-    video.play().catch(error => console.error("Error de Autoplay:", error.message));
+    video.play().catch(error => console.error("Error de Autoplay inicial:", error.message));
 
     const pauseAtTime = () => {
       if (video.currentTime >= question.pause_timestamp_secs) {
         video.pause();
+        console.log(`[PROYECCIÓN] Video pausado en ${video.currentTime}s`);
+        // --- CORRECCIÓN CLAVE ---
+        // Una vez que pausamos, quitamos el 'listener' para que no vuelva a pausar el video
+        // cuando intentemos reanudarlo más tarde.
+        video.removeEventListener('timeupdate', pauseAtTime); 
       }
     };
+    
     video.addEventListener('timeupdate', pauseAtTime);
 
-    return () => video.removeEventListener('timeupdate', pauseAtTime);
-  }, [question]); // Este efecto se activa SOLO cuando la variable 'question' cambia
+    return () => {
+      // Limpieza por si el componente se desmonta antes de tiempo
+      video.removeEventListener('timeupdate', pauseAtTime);
+    };
+  }, [question]);
 
-  // Este efecto se activa SOLO cuando 'revealedAnswer' cambia
   useEffect(() => {
+    // Este efecto se activa SOLO cuando 'revealedAnswer' cambia
     if (revealedAnswer && videoRef.current) {
-      videoRef.current.play().catch(error => console.error("Error de Autoplay:", error.message));
+      console.log('[PROYECCIÓN] Revelando respuesta. Continuando video...');
+      videoRef.current.play().catch(error => console.error("Error de Autoplay en revelación:", error.message));
     }
   }, [revealedAnswer]);
 
+  if (question) {
+    const options = [question.option_1, question.option_2, question.option_3, question.option_4];
+    return (
+      <div style={styles.container}>
+        <video ref={videoRef} style={styles.video} muted playsInline>Tu navegador no soporta videos.</video>
+        <h1 style={styles.questionText}>{question.question_text}</h1>
+        <div style={styles.optionsContainer}>
+          {options.map((text, index) => {
+            const optionNumber = index + 1;
+            const isCorrect = revealedAnswer === optionNumber;
+            return (
+              <div key={optionNumber} style={{...styles.option, ...(isCorrect && styles.correctOption)}}>
+                {text}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.container}>
-      
-      {/* El resto de la lógica de renderizado se queda igual */}
-      {gameState === 'showing_question' && question ? (
-        <>
-          <video ref={videoRef} style={styles.video} muted playsInline>Tu navegador no soporta videos.</video>
-          <h1 style={styles.questionText}>{question.question_text}</h1>
-          <div style={styles.optionsContainer}>
-            {[question.option_1, question.option_2, question.option_3, question.option_4].map((text, index) => {
-              const optionNumber = index + 1;
-              const isCorrect = revealedAnswer === optionNumber;
-              return (
-                <div key={optionNumber} style={{...styles.option, ...(isCorrect && styles.correctOption)}}>
-                  {text}
-                </div>
-              );
-            })}
-          </div>
-        </>
-      ) : (
-        <h1>TRIVIA GAME - Esperando...</h1>
-      )}
+      <h1>TRIVIA GAME</h1>
+      <p style={{fontSize: '1.5em'}}>Esperando que el administrador inicie el juego...</p>
     </div>
   );
 }
