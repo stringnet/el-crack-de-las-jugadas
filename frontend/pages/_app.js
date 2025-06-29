@@ -1,13 +1,13 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { getSocket } from '../lib/socket';
+import { getPlayerSocket } from '../lib/socket';
 import Layout from '../components/Layout';
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
 
   useEffect(() => {
-    const socket = getSocket();
+    const socket = getPlayerSocket();
 
     const handleGameStarted = () => {
       console.log('Evento global game_started recibido.');
