@@ -1,5 +1,5 @@
 const { Server } = require('socket.io');
-const db = require('../config/db'); // Importamos nuestra conexión a la DB
+const db = require('./config/db'); // Importamos nuestra conexión a la DB
 
 // El estado del juego ahora es más simple, solo controla si la partida está activa
 // y cuál es la pregunta actual. Los jugadores se gestionan en la DB.
