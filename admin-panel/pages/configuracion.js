@@ -1,52 +1,85 @@
-// admin-panel/pages/configuracion.js
 import { useState, useEffect } from 'react';
-import withAuth from '../components/withAuth'; // <-- 1. Importamos el guardia
+import withAuth from '../components/withAuth';
 
 function ConfiguracionPage() {
-    // Estado para guardar los valores de los campos del formulario
+    // Estado para guardar todos los valores de configuración
     const [settings, setSettings] = useState({
+        game_title: '',
         logo_url: '',
         background_url: '',
         font_family: '',
-        game_title: '' // Añadimos el nuevo campo que creamos como ejemplo
+        projection_background_url: '' // Campo para la nueva imagen de fondo
     });
 
-    // Estado para mostrar mensajes al usuario (ej. "Guardando...", "Éxito!")
+    // Estado para mostrar mensajes al usuario
     const [status, setStatus] = useState('');
+    const [uploading, setUploading] = useState(false); // Estado para saber si se está subiendo un archivo
+    const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-    // Este efecto se ejecuta una sola vez cuando la página carga
+    // Carga la configuración actual del backend cuando la página se monta
     useEffect(() => {
-        // Hacemos una petición a nuestro backend para obtener la configuración actual
-        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/settings`)
-            .then(res => res.json())
+        setStatus('Cargando configuración...');
+        fetch(`${API_URL}/api/settings`)
+            .then(res => res.ok ? res.json() : {})
             .then(data => {
-                // Rellenamos el estado 'settings' con los datos de la base de datos
-                setSettings(data);
+                setSettings(prev => ({ ...prev, ...data }));
+                setStatus('');
             })
             .catch(err => {
                 console.error("Error al cargar la configuración inicial", err);
                 setStatus('No se pudo cargar la configuración.');
             });
-    }, []); // El array vacío [] asegura que se ejecute solo una vez
+    }, [API_URL]);
 
-    // Esta función maneja los cambios en cualquier campo del formulario
+    // Maneja los cambios en los campos de texto
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setSettings(prevSettings => ({
-            ...prevSettings,
-            [name]: value
-        }));
+        setSettings(prevSettings => ({ ...prevSettings, [name]: value }));
     };
 
-    // Esta función se ejecuta cuando se envía el formulario
-    const handleSubmit = async (e) => {
-        e.preventDefault(); // Evita que la página se recargue
-        setStatus('Guardando...'); // Informamos al usuario
+    // --- NUEVA FUNCIÓN PARA MANEJAR LA SUBIDA DE LA IMAGEN DE FONDO ---
+    const handleImageUpload = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        setUploading(true);
+        setStatus('Subiendo imagen de fondo...');
+        
+        const uploadFormData = new FormData();
+        uploadFormData.append('video', file); // El backend espera el campo 'video', es genérico
+
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/settings`, {
+            const res = await fetch(`${API_URL}/api/upload`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(settings), // Enviamos toda la configuración al backend
+                body: uploadFormData,
+            });
+
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.message || 'Error en la subida.');
+            
+            setSettings(prev => ({ ...prev, projection_background_url: result.video_url }));
+            setStatus('¡Imagen subida! Haz clic en "Guardar" para aplicar el cambio.');
+
+        } catch (err) {
+            setStatus(`Error al subir imagen: ${err.message}`);
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    // Maneja el guardado de TODA la configuración
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setStatus('Guardando toda la configuración...');
+        try {
+            const token = localStorage.getItem('admin_token');
+            const res = await fetch(`${API_URL}/api/settings`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(settings),
             });
 
             if (res.ok) {
@@ -59,63 +92,58 @@ function ConfiguracionPage() {
             console.error(err);
         }
     };
-
-    // Estilos para hacer el formulario más legible
+    
     const inputStyle = { width: '100%', padding: '8px', margin: '5px 0 15px 0', boxSizing: 'border-box', fontSize: '1rem' };
     const labelStyle = { fontWeight: 'bold', marginTop: '10px', display: 'block' };
 
     return (
         <div>
             <h1>Configuración General del Juego</h1>
+            
+            {/* El formulario ahora llama a handleSubmit */}
             <form onSubmit={handleSubmit} style={{ maxWidth: '600px' }}>
+
+                {/* --- NUEVA SECCIÓN PARA LA PANTALLA DE PROYECCIÓN --- */}
+                <div style={{ padding: '20px', border: '2px solid #007bff', borderRadius: '8px', marginBottom: '30px' }}>
+                    <h2>Pantalla de Proyección (Modo Espera)</h2>
+                    <label style={labelStyle}>Imagen de Fondo (1920x1080 recomendado)</label>
+                    <input 
+                    type="file" 
+                    accept="image/jpeg, image/png, image/webp" 
+                    onChange={handleImageUpload} 
+                    disabled={uploading}
+                    style={{ display: 'block', margin: '10px 0' }}
+                    />
+                    {settings.projection_background_url && (
+                        <div>
+                            <p>Vista previa actual:</p>
+                            <img src={settings.projection_background_url} alt="Vista previa del fondo" style={{ width: '100%', border: '1px solid #ddd', borderRadius: '4px' }} />
+                        </div>
+                    )}
+                </div>
+                
+                {/* --- SECCIÓN PARA LA CONFIGURACIÓN GENERAL --- */}
                 <label style={labelStyle}>Título del Juego</label>
-                <input
-                    style={inputStyle}
-                    type="text"
-                    name="game_title"
-                    value={settings.game_title || ''}
-                    onChange={handleChange}
-                    placeholder="Ej: El Desafío Deportivo"
-                />
+                <input style={inputStyle} type="text" name="game_title" value={settings.game_title || ''} onChange={handleChange} placeholder="Ej: El Desafío Deportivo" />
 
                 <label style={labelStyle}>URL del Logo Principal</label>
-                <input
-                    style={inputStyle}
-                    type="text"
-                    name="logo_url"
-                    value={settings.logo_url || ''}
-                    onChange={handleChange}
-                    placeholder="https://ejemplo.com/logo.png"
-                />
+                <input style={inputStyle} type="text" name="logo_url" value={settings.logo_url || ''} onChange={handleChange} placeholder="https://ejemplo.com/logo.png" />
 
-                <label style={labelStyle}>URL Imagen de Fondo (Inicio)</label>
-                <input
-                    style={inputStyle}
-                    type="text"
-                    name="background_url"
-                    value={settings.background_url || ''}
-                    onChange={handleChange}
-                    placeholder="https://ejemplo.com/fondo.jpg"
-                />
+                <label style={labelStyle}>URL Imagen de Fondo (Pantalla de Jugador)</label>
+                <input style={inputStyle} type="text" name="background_url" value={settings.background_url || ''} onChange={handleChange} placeholder="https://ejemplo.com/fondo.jpg" />
                 
                 <label style={labelStyle}>Fuente de Google Fonts (ej. "Roboto")</label>
-                <input
-                    style={inputStyle}
-                    type="text"
-                    name="font_family"
-                    value={settings.font_family || ''}
-                    onChange={handleChange}
-                    placeholder="Roboto"
-                />
+                <input style={inputStyle} type="text" name="font_family" value={settings.font_family || ''} onChange={handleChange} placeholder="Roboto" />
 
-                <button type="submit" style={{ marginTop: '20px', padding: '10px 20px', fontSize: '1rem' }}>
-                    Guardar Configuración
+                <button type="submit" style={{ marginTop: '20px', padding: '10px 20px', fontSize: '1rem', width: '100%' }} disabled={uploading}>
+                    {uploading ? 'Subiendo imagen...' : 'Guardar Toda la Configuración'}
                 </button>
 
-                {/* Mostramos el mensaje de estado al lado del botón */}
-                {status && <span style={{ marginLeft: '15px', fontWeight: 'bold' }}>{status}</span>}
+                {status && <p style={{ marginTop: '15px', fontWeight: 'bold', textAlign: 'center' }}>{status}</p>}
             </form>
         </div>
     );
 }
-export default withAuth(ConfiguracionPage); // <-- 2. Envolvemos la página al exportarla
+
+// Envolvemos con el guardia de seguridad
+export default withAuth(ConfiguracionPage);
