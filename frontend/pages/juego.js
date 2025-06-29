@@ -51,7 +51,7 @@ export default function GamePage() {
     socket.on('server:new_question', handleNewQuestion);
 
     const handleGameOver = ({ finalRanking }) => {
-      const myResult = finalRanking.find(p => p.id === socket.id);
+      const myResult = finalRanking.find(p => p.socket_id === socket.id);
       setFinalScore(myResult ? myResult.score : 0);
       setGameState('game_over');
     };
