@@ -6,7 +6,7 @@ let socket;
  * Esta función crea una ÚNICA instancia de socket para toda la aplicación del frontend
  * y la reutiliza, evitando crear múltiples conexiones.
  */
-export const getSocket = () => {
+export const getPlayerSocket = () => {
   // Si el socket aún no ha sido creado, lo creamos.
   if (!socket) {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
