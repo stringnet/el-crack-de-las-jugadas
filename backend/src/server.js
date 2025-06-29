@@ -1,33 +1,35 @@
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
-const apiRoutes = require('./api/routes'); // Importamos nuestras rutas
-const path = require('path'); // Importamos el módulo 'path' de Node.js
+const path = require('path'); // Nos aseguramos de que 'path' esté importado
+const apiRoutes = require('./api/routes');
 
 const app = express();
 const server = http.createServer(app);
 
-// Configuración de CORS para permitir peticiones desde nuestros dominios de frontend
+// Configuración de CORS
 const corsOptions = {
   origin: [process.env.FRONTEND_URL, process.env.ADMIN_URL]
 };
-
 app.use(cors(corsOptions));
 
-// Middleware para que Express entienda peticiones con cuerpo en formato JSON
+// Middleware para entender JSON
 app.use(express.json());
 
-// --- LÍNEA NUEVA ---
-// Hacemos que la carpeta /public/uploads sea accesible desde la web en la ruta /uploads
-app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
-// --------------------
+// --- CORRECCIÓN FINAL PARA SERVIR ARCHIVOS ESTÁTICOS ---
+// Usamos path.resolve() para crear una ruta absoluta desde la raíz del proyecto
+// dentro del contenedor, lo cual es el método más robusto.
+const uploadsDir = path.resolve(process.cwd(), 'public/uploads');
+app.use('/uploads', express.static(uploadsDir));
+console.log(`Sirviendo archivos estáticos desde: ${uploadsDir}`);
+// ----------------------------------------------------
 
-// Ruta principal de prueba
+// Ruta de prueba
 app.get('/', (req, res) => {
   res.send('El servidor del Crack de las Jugadas está operativo!');
 });
 
-// Usamos nuestro enrutador para todas las peticiones que empiecen con /api
+// Rutas de la API
 app.use('/api', apiRoutes);
 
 module.exports = { app, server };
