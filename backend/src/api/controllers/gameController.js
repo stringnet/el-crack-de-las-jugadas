@@ -1,92 +1,56 @@
 const db = require('../../config/db');
 
-/**
- * Obtiene todas las preguntas de la base de datos.
- */
-const getQuestions = async (req, res) => {
-  try {
-    const { rows } = await db.query('SELECT * FROM questions ORDER BY id ASC');
-    res.json(rows);
-  } catch (err) {
-    console.error("Error en getQuestions:", err.message);
-    res.status(500).send('Error en el servidor');
-  }
-};
+// OBTENER todas las preguntas (sin cambios)
+const getQuestions = async (req, res) => { /* ...código existente... */ };
 
-/**
- * Crea una nueva pregunta en la base de datos.
- */
-const createQuestion = async (req, res) => {
+// CREAR una nueva pregunta (sin cambios)
+const createQuestion = async (req, res) => { /* ...código existente... */ };
+
+// --- NUEVA FUNCIÓN PARA ACTUALIZAR (EDITAR) ---
+const updateQuestion = async (req, res) => {
   try {
-    // Añadimos 'time_limit_secs' a la lista de variables que recibimos
+    const { id } = req.params; // Obtenemos el ID de la URL
     const { question_text, video_url, pause_timestamp_secs, points, time_limit_secs, option_1, option_2, option_3, option_4, correct_option } = req.body;
     
-    // Y lo añadimos a la consulta INSERT
-    const newQuestion = await db.query(
-      "INSERT INTO questions (question_text, video_url, pause_timestamp_secs, points, time_limit_secs, option_1, option_2, option_3, option_4, correct_option) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *",
-      [question_text, video_url, pause_timestamp_secs, points, time_limit_secs, option_1, option_2, option_3, option_4, correct_option]
+    const updatedQuestion = await db.query(
+      "UPDATE questions SET question_text = $1, video_url = $2, pause_timestamp_secs = $3, points = $4, time_limit_secs = $5, option_1 = $6, option_2 = $7, option_3 = $8, option_4 = $9, correct_option = $10 WHERE id = $11 RETURNING *",
+      [question_text, video_url, pause_timestamp_secs, points, time_limit_secs, option_1, option_2, option_3, option_4, correct_option, id]
     );
-    
-    res.status(201).json(newQuestion.rows[0]);
-  } catch (err) {
-    console.error("Error en createQuestion:", err.message);
-    res.status(500).send('Error en el servidor');
-  }
-};
 
-/**
- * Obtiene todas las configuraciones del juego desde la tabla GameSettings.
- */
-const getGameSettings = async (req, res) => {
-  try {
-    const { rows } = await db.query('SELECT * FROM gamesettings');
-    
-    // Convertimos el array de filas (ej. [{setting_key: 'logo_url', setting_value: '...'}])
-    // en un único objeto fácil de usar (ej. { logo_url: '...' }).
-    const settings = rows.reduce((acc, row) => {
-      acc[row.setting_key] = row.setting_value;
-      return acc;
-    }, {});
-    
-    res.json(settings);
-  } catch (err) {
-    console.error("Error en getGameSettings:", err.message);
-    res.status(500).send('Error en el servidor');
-  }
-};
-
-/**
- * Actualiza las configuraciones del juego. Recibe un objeto con las claves y valores a actualizar.
- */
-const updateGameSettings = async (req, res) => {
-  try {
-    const settings = req.body; // Recibimos un objeto como { logo_url: '...', font_family: '...' }
-    
-    // Usamos un bucle para guardar cada clave-valor
-    for (const key in settings) {
-      if (Object.hasOwnProperty.call(settings, key)) {
-        const value = settings[key];
-        
-        // Este comando especial (UPSERT) inserta una nueva clave si no existe,
-        // o la actualiza si ya existe. ¡Es muy potente y flexible!
-        await db.query(
-          'INSERT INTO gamesettings (setting_key, setting_value) VALUES ($1, $2) ON CONFLICT (setting_key) DO UPDATE SET setting_value = $2',
-          [key, value]
-        );
-      }
+    if (updatedQuestion.rows.length === 0) {
+      return res.status(404).json({ message: 'Pregunta no encontrada' });
     }
-    
-    res.status(200).json({ message: 'Configuración guardada exitosamente' });
+    res.json(updatedQuestion.rows[0]);
   } catch (err) {
-    console.error("Error en updateGameSettings:", err.message);
+    console.error("Error en updateQuestion:", err.message);
     res.status(500).send('Error en el servidor');
   }
 };
 
-// Exportamos todas las funciones para que puedan ser usadas en las rutas de la API.
+// --- NUEVA FUNCIÓN PARA BORRAR ---
+const deleteQuestion = async (req, res) => {
+  try {
+    const { id } = req.params; // Obtenemos el ID de la URL
+    
+    const deleteOp = await db.query("DELETE FROM questions WHERE id = $1 RETURNING *", [id]);
+
+    if (deleteOp.rowCount === 0) {
+      return res.status(404).json({ message: 'Pregunta no encontrada' });
+    }
+    res.status(200).json({ message: 'Pregunta borrada exitosamente' });
+  } catch (err) {
+    console.error("Error en deleteQuestion:", err.message);
+    res.status(500).send('Error en el servidor');
+  }
+};
+
+// ... (getGameSettings y updateGameSettings se quedan igual) ...
+
 module.exports = {
   getQuestions,
   createQuestion,
+  updateQuestion, // <-- Añadimos la nueva función
+  deleteQuestion, // <-- Añadimos la nueva función
   getGameSettings,
   updateGameSettings
 };
