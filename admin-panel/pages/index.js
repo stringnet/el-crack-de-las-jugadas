@@ -1,22 +1,20 @@
 import { useState, useEffect } from 'react';
-import { getAdminSocket } from '../lib/socket'; // <-- Importamos nuestro nuevo gestor
+import { getAdminSocket } from '../lib/socket';
+import withAuth from '../components/withAuth'; // <-- 1. IMPORTAMOS EL GUARDIA DE SEGURIDAD
 
-export default function AdminDashboard() {
+function AdminDashboard() { // <-- 2. La función ahora es una declaración normal, no una exportación por defecto
   const [questions, setQuestions] = useState([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState('');
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
-    // Obtenemos la instancia del socket y la guardamos en el estado
     const adminSocket = getAdminSocket();
     setSocket(adminSocket);
 
-    // Listener para recibir feedback del servidor
     adminSocket.on('admin:feedback', (data) => {
       alert(`Mensaje del Servidor: ${data.message}`);
     });
 
-    // Cargar las preguntas disponibles desde la API
     const fetchQuestions = async () => {
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/questions`);
@@ -32,7 +30,9 @@ export default function AdminDashboard() {
     fetchQuestions();
 
     return () => {
-      adminSocket.off('admin:feedback');
+      if (adminSocket) {
+        adminSocket.off('admin:feedback');
+      }
     }
   }, []);
 
@@ -73,12 +73,11 @@ export default function AdminDashboard() {
               Enviar Pregunta
             </button>
           </>
-        ) : <p>No hay preguntas disponibles.</p>}
+        ) : <p>Cargando preguntas o no hay ninguna creada...</p>}
       </div>
 
        <div style={{ background: '#fee', padding: '20px', borderRadius: '8px' }}>
         <h2>Control General del Juego</h2>
-        {/* Los botones ahora llaman a nuestras nuevas funciones */}
         <button onClick={startGame} style={{ padding: '10px 20px', fontSize: '1rem' }}>
           Iniciar Juego (Reiniciar)
         </button>
@@ -89,3 +88,6 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+// --- 3. EXPORTAMOS LA VERSIÓN PROTEGIDA DEL DASHBOARD ---
+export default withAuth(AdminDashboard);
