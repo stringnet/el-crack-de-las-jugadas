@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import io from 'socket.io-client'; // Importamos 'io' directamente para esta página
+import io from 'socket.io-client';
 
-// --- Estilos para la página ---
 const styles = {
   container: { position: 'relative', width: '100vw', height: '100vh', backgroundColor: 'black', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial, sans-serif', textAlign: 'center' },
   video: { width: '80%', maxHeight: '60vh', border: '4px solid white', borderRadius: '10px', backgroundColor: '#111' },
@@ -16,16 +15,11 @@ export default function ProjectionPage() {
   const [revealedAnswer, setRevealedAnswer] = useState(null);
   const videoRef = useRef(null);
 
-  // EFECTO 1: MANEJO DE EVENTOS DE SOCKET
+  // EFECTO 1: Se conecta al socket y gestiona los eventos de estado.
   useEffect(() => {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    // Creamos una conexión dedicada solo para esta página al namespace '/projection'
     const socket = io(`${backendUrl}/projection`);
-
-    socket.on('connect', () => {
-        console.log(`[PROYECCIÓN] Conectado al servidor con ID: ${socket.id}`);
-    });
-
+    
     const handleNewQuestion = (newQuestion) => {
       setRevealedAnswer(null);
       setQuestion(newQuestion);
@@ -43,49 +37,57 @@ export default function ProjectionPage() {
     socket.on('server:game_over', resetScreen);
     socket.on('server:game_started', resetScreen);
 
-    // Limpieza al desmontar el componente
     return () => {
-      console.log('[PROYECCIÓN] Desconectando socket de proyección.');
       socket.disconnect();
     };
-  }, []); // Se ejecuta solo una vez
+  }, []);
 
-  // EFECTO 2: MANEJO DE LA PAUSA DEL VIDEO
+  // --- EFECTO 2: EL ÚNICO DIRECTOR DEL VIDEO ---
+  // Se activa cada vez que la 'pregunta' o la 'respuesta revelada' cambian.
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !question) return;
+    if (!video) return;
 
-    const pauseAtTime = () => {
-      if (!video.paused && video.currentTime >= question.pause_timestamp_secs) {
+    // Se define la función que escucha el tiempo
+    const timeUpdateListener = () => {
+      if (question && !video.paused && video.currentTime >= question.pause_timestamp_secs) {
         video.pause();
       }
     };
-    video.addEventListener('timeupdate', pauseAtTime);
 
-    return () => video.removeEventListener('timeupdate', pauseAtTime);
-  }, [question]);
+    // Limpiamos cualquier listener anterior para evitar duplicados
+    video.removeEventListener('timeupdate', timeUpdateListener);
 
-  // EFECTO 3: MANEJO DE LA REANUDACIÓN DEL VIDEO
-  useEffect(() => {
-    if (revealedAnswer && videoRef.current) {
-      videoRef.current.play().catch(error => console.error("Error al reanudar video:", error.message));
+    if (question && !revealedAnswer) {
+      // FASE 1: Hay una nueva pregunta y no hay respuesta revelada
+      video.src = question.video_url;
+      video.load();
+      video.play().catch(e => console.error("Error de Autoplay:", e));
+      video.addEventListener('timeupdate', timeUpdateListener);
+    } else if (question && revealedAnswer) {
+      // FASE 2: Se ha revelado la respuesta, solo queremos continuar
+      // El listener de 'timeupdate' ya fue limpiado por el ciclo anterior de este efecto
+      video.play().catch(e => console.error("Error al reanudar:", e));
     }
-  }, [revealedAnswer]);
+    
+    // La función de limpieza se asegura de que no queden listeners "fantasma"
+    return () => {
+        video.removeEventListener('timeupdate', timeUpdateListener);
+    }
 
-  // --- RENDERIZADO DE LA INTERFAZ ---
+  }, [question, revealedAnswer]);
 
-  // Si hay una pregunta, mostramos la vista del juego
   if (question) {
     const options = [question.option_1, question.option_2, question.option_3, question.option_4];
     return (
       <div style={styles.container}>
         <video
-          key={question.id} // La 'key' fuerza a React a crear un nuevo elemento de video para cada pregunta
+          key={question.id}
           ref={videoRef}
           style={styles.video}
           muted
           playsInline
-          autoPlay // El navegador intenta reproducir automáticamente
+          // Quitamos autoPlay de aquí para tener control total en el useEffect
         >
           <source src={question.video_url} type="video/mp4" />
           Tu navegador no soporta videos.
@@ -96,18 +98,14 @@ export default function ProjectionPage() {
           {options.map((text, index) => {
             const optionNumber = index + 1;
             const isCorrect = revealedAnswer === optionNumber;
-            return (
-              <div key={optionNumber} style={{...styles.option, ...(isCorrect && styles.correctOption)}}>
-                {text}
-              </div>
-            );
+            return <div key={optionNumber} style={{...styles.option, ...(isCorrect && styles.correctOption)}}>{text}</div>;
           })}
         </div>
       </div>
     );
   }
 
-  // Si no hay pregunta, mostramos la pantalla de espera
+  // Pantalla de espera por defecto
   return (
     <div style={styles.container}>
       <h1>TRIVIA GAME</h1>
