@@ -1,41 +1,38 @@
 import { useEffect, useState, useRef } from 'react';
 import { getSocket } from '../lib/socket';
 
-// --- Estilos (puedes moverlos a un archivo .css si prefieres) ---
 const styles = {
-  container: { width: '100vw', height: '100vh', backgroundColor: 'black', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial, sans-serif', textAlign: 'center' },
+  container: { position: 'relative', width: '100vw', height: '100vh', backgroundColor: 'black', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial, sans-serif', textAlign: 'center' },
   video: { width: '80%', maxHeight: '60vh', border: '4px solid white', borderRadius: '10px', backgroundColor: '#111' },
   questionText: { fontSize: '3em', margin: '20px 0', textShadow: '2px 2px 4px #000' },
   optionsContainer: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', width: '80%' },
   option: { backgroundColor: '#333', padding: '20px', borderRadius: '10px', fontSize: '1.8em', border: '2px solid #555', transition: 'all 0.3s ease' },
-  correctOption: { backgroundColor: 'green', borderColor: 'lightgreen', transform: 'scale(1.05)' }
+  correctOption: { backgroundColor: 'green', borderColor: 'lightgreen', transform: 'scale(1.05)' },
+  // --- Estilos para nuestro nuevo monitor de estado ---
+  debugMonitor: { position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(0,0,0,0.7)', color: 'lightgreen', padding: '10px', fontSize: '12px', zIndex: 9999, border: '1px solid lightgreen', fontFamily: 'monospace' }
 };
 
 export default function ProjectionPage() {
+  const [gameState, setGameState] = useState('waiting');
   const [question, setQuestion] = useState(null);
   const [revealedAnswer, setRevealedAnswer] = useState(null);
   const videoRef = useRef(null);
 
   // --- EFECTO 1: MANEJO DE EVENTOS DE SOCKET ---
   useEffect(() => {
-    console.log('[PROYECCIÓN] Montado y esperando eventos.');
     const socket = getSocket();
 
     const handleNewQuestion = (newQuestion) => {
-      console.log('[PROYECCIÓN] Recibido: server:new_question', newQuestion);
       setRevealedAnswer(null);
-      setQuestion(newQuestion); // Solo actualizamos el estado. React se encargará del resto.
+      setQuestion(newQuestion);
+      setGameState('showing_question');
     };
-
     const handleRevealAnswer = ({ correctOption }) => {
-      console.log('[PROYECCIÓN] Recibido: server:reveal_answer');
       setRevealedAnswer(correctOption);
     };
-
     const resetScreen = () => {
-      console.log('[PROYECCIÓN] Recibido: game_started o game_over. Reseteando pantalla.');
+      setGameState('waiting');
       setQuestion(null);
-      setRevealedAnswer(null);
     }
     
     socket.on('server:new_question', handleNewQuestion);
@@ -51,74 +48,66 @@ export default function ProjectionPage() {
     };
   }, []);
 
-  // --- EFECTO 2: MANEJO DEL VIDEO (SE ACTIVA CUANDO 'question' o 'revealedAnswer' CAMBIAN) ---
+  // --- EFECTO 2: MANEJO DEL VIDEO ---
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !question) return;
 
-    // Si tenemos una pregunta, configuramos el video para que se reproduzca y se pause.
-    if (question) {
-      console.log('[PROYECCIÓN] El estado "question" cambió. Configurando video:', question.video_url);
-      video.src = question.video_url;
-      video.load();
-      
-      const playPromise = video.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => console.error("Error de Autoplay:", error.message));
+    video.src = question.video_url;
+    video.load();
+    video.play().catch(error => console.error("Error de Autoplay:", error.message));
+
+    const pauseAtTime = () => {
+      if (video.currentTime >= question.pause_timestamp_secs) {
+        video.pause();
       }
+    };
+    video.addEventListener('timeupdate', pauseAtTime);
 
-      const pauseAtTime = () => {
-        if (video.currentTime >= question.pause_timestamp_secs) {
-          video.pause();
-          console.log(`[PROYECCIÓN] Video pausado en ${video.currentTime}s`);
-          video.removeEventListener('timeupdate', pauseAtTime); // Lo removemos para que no se active de nuevo
-        }
-      };
-      video.addEventListener('timeupdate', pauseAtTime);
+    return () => video.removeEventListener('timeupdate', pauseAtTime);
+  }, [question]); // Este efecto se activa SOLO cuando la variable 'question' cambia
 
-      // Limpieza para este efecto específico
-      return () => video.removeEventListener('timeupdate', pauseAtTime);
+  // Este efecto se activa SOLO cuando 'revealedAnswer' cambia
+  useEffect(() => {
+    if (revealedAnswer && videoRef.current) {
+      videoRef.current.play().catch(error => console.error("Error de Autoplay:", error.message));
     }
-    
-    // Si tenemos una respuesta revelada, continuamos la reproducción.
-    if (revealedAnswer) {
-      console.log('[PROYECCIÓN] El estado "revealedAnswer" cambió. Continuando video.');
-      const playPromise = video.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => console.error("Error de Autoplay:", error.message));
-      }
-    }
+  }, [revealedAnswer]);
 
-  }, [question, revealedAnswer]);
-
-
-  // --- RENDERIZADO DE LA INTERFAZ ---
-  if (question) {
-    const options = [question.option_1, question.option_2, question.option_3, question.option_4];
-    return (
-      <div style={styles.container}>
-        <video ref={videoRef} style={styles.video} muted playsInline>Tu navegador no soporta videos.</video>
-        <h1 style={styles.questionText}>{question.question_text}</h1>
-        <div style={styles.optionsContainer}>
-          {options.map((text, index) => {
-            const optionNumber = index + 1;
-            const isCorrect = revealedAnswer === optionNumber;
-            return (
-              <div key={optionNumber} style={{...styles.option, ...(isCorrect && styles.correctOption)}}>
-                {text}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  // Pantalla de espera por defecto
   return (
     <div style={styles.container}>
-        <h1>TRIVIA GAME</h1>
-        <p style={{fontSize: '1.5em'}}>Esperando que el administrador inicie el juego...</p>
+      {/* --- NUESTRO MONITOR DE ESTADO --- */}
+      <div style={styles.debugMonitor}>
+        <h3>Monitor de Estado</h3>
+        <pre>
+          Game State: {gameState}
+          <br />
+          Question: {question ? `ID ${question.id}` : 'null'}
+          <br />
+          Revealed: {revealedAnswer || 'null'}
+        </pre>
+      </div>
+
+      {/* El resto de la lógica de renderizado se queda igual */}
+      {gameState === 'showing_question' && question ? (
+        <>
+          <video ref={videoRef} style={styles.video} muted playsInline>Tu navegador no soporta videos.</video>
+          <h1 style={styles.questionText}>{question.question_text}</h1>
+          <div style={styles.optionsContainer}>
+            {[question.option_1, question.option_2, question.option_3, question.option_4].map((text, index) => {
+              const optionNumber = index + 1;
+              const isCorrect = revealedAnswer === optionNumber;
+              return (
+                <div key={optionNumber} style={{...styles.option, ...(isCorrect && styles.correctOption)}}>
+                  {text}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <h1>TRIVIA GAME - Esperando...</h1>
+      )}
     </div>
   );
 }
