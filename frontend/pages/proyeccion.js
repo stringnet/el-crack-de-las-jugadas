@@ -40,42 +40,60 @@ export default function ProjectionPage() {
     };
   }, []);
 
-  // Este efecto ahora SÓLO se encarga de pausar el video en el tiempo correcto.
+  // --- EFECTO PRINCIPAL PARA CONTROLAR EL VIDEO ---
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !question) return;
 
-    const pauseAtTime = () => {
-      if (!video.paused && video.currentTime >= question.pause_timestamp_secs) {
-        video.pause();
-      }
-    };
-    video.addEventListener('timeupdate', pauseAtTime);
-    return () => video.removeEventListener('timeupdate', pauseAtTime);
-  }, [question]);
+    // --- LÓGICA DE INICIO Y PAUSA ---
+    if (question.video_url && !revealedAnswer) {
+      console.log(`[PROYECCIÓN] Configurando video para pregunta ID: ${question.id}`);
+      
+      const playVideo = () => {
+        video.play().catch(e => console.error("Error de Autoplay:", e.message));
+      };
 
-  // Este efecto se encarga de REANUDAR el video cuando se revela la respuesta.
-  useEffect(() => {
-    if (revealedAnswer && videoRef.current) {
-      videoRef.current.play().catch(error => console.error("Error al reanudar video:", error.message));
+      const pauseAtTime = () => {
+        if (!video.paused && video.currentTime >= question.pause_timestamp_secs) {
+          video.pause();
+          console.log(`[PROYECCIÓN] Video pausado en ${video.currentTime}s.`);
+        }
+      };
+
+      // Limpiamos listeners anteriores para evitar duplicados
+      video.removeEventListener('canplay', playVideo);
+      video.removeEventListener('timeupdate', pauseAtTime);
+
+      // Asignamos la nueva fuente
+      video.src = question.video_url;
+      
+      // Añadimos los nuevos listeners
+      video.addEventListener('canplay', playVideo, { once: true }); // 'canplay' es más robusto que 'loadeddata' y se ejecuta una sola vez.
+      video.addEventListener('timeupdate', pauseAtTime);
+
+      // Le decimos al navegador que cargue el nuevo video
+      video.load();
     }
-  }, [revealedAnswer]);
+    
+    // --- LÓGICA PARA REANUDAR EL VIDEO ---
+    if (revealedAnswer) {
+      console.log('[PROYECCIÓN] Revelando respuesta. Reanudando video...');
+      video.play().catch(e => console.error("Error al reanudar video:", e.message));
+    }
+
+  }, [question, revealedAnswer]);
 
   if (question) {
     const options = [question.option_1, question.option_2, question.option_3, question.option_4];
     return (
       <div style={styles.container}>
-        {/* --- LA MAGIA ESTÁ AQUÍ, EN LA PROPIEDAD 'key' --- */}
-        {/* Al cambiar el ID de la pregunta, React destruye el video anterior y crea uno nuevo */}
         <video
           key={question.id}
           ref={videoRef}
           style={styles.video}
           muted
-          playsInline
-          autoPlay // El navegador se encarga de la reproducción inicial
+          playsInline // Importante para iOS
         >
-          {/* Usar el tag <source> es más robusto */}
           <source src={question.video_url} type="video/mp4" />
           Tu navegador no soporta videos.
         </video>
