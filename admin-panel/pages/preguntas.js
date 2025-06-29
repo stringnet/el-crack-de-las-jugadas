@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import QuestionForm from '../components/QuestionForm';
+import withAuth from '../components/withAuth'; // <-- 1. Importamos el guardia
 
-export default function PreguntasPage() {
+function PreguntasPage() {
   const [questions, setQuestions] = useState([]);
   const [editingQuestion, setEditingQuestion] = useState(null); // Estado para la pregunta en edición
   const [status, setStatus] = useState('');
@@ -125,3 +126,5 @@ export default function PreguntasPage() {
     </div>
   );
 }
+// --- 2. EXPORTAMOS LA VERSIÓN PROTEGIDA DE LA PÁGINA ---
+export default withAuth(PreguntasPage);
