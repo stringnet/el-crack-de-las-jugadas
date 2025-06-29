@@ -1,8 +1,7 @@
-// admin-panel/components/QuestionForm.jsx
 import { useState } from 'react';
 
 const QuestionForm = ({ onSubmit, initialData = {} }) => {
-  // El estado inicial ahora incluye todos los campos con valores por defecto
+  // El estado del formulario se mantiene igual
   const [formData, setFormData] = useState({
     question_text: initialData.question_text || '',
     video_url: initialData.video_url || '',
@@ -16,15 +15,60 @@ const QuestionForm = ({ onSubmit, initialData = {} }) => {
     correct_option: initialData.correct_option || 1,
   });
 
-  // Función genérica para manejar los cambios de cualquier input
+  // --- NUEVOS ESTADOS PARA LA SUBIDA DE VIDEO ---
+  const [uploading, setUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
+  // ---------------------------------------------
+
+  // Función genérica para manejar los cambios de cualquier input de texto
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
+  
+  // --- NUEVA FUNCIÓN PARA MANEJAR LA SUBIDA DEL VIDEO ---
+  const handleVideoUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
 
-  // Función que se ejecuta al enviar el formulario
+    setUploading(true);
+    setUploadStatus('Subiendo video...');
+    
+    const uploadFormData = new FormData();
+    uploadFormData.append('video', file); // 'video' debe coincidir con el nombre en el backend (multer)
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/upload`, {
+        method: 'POST',
+        body: uploadFormData,
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.message || 'Error en la subida del archivo.');
+      }
+      
+      // Ponemos la URL devuelta por el servidor en el campo de texto del formulario
+      setFormData(prev => ({ ...prev, video_url: result.video_url }));
+      setUploadStatus('¡Video subido con éxito!');
+
+    } catch (err) {
+      setUploadStatus(`Error: ${err.message}`);
+      console.error(err);
+    } finally {
+      setUploading(false);
+    }
+  };
+  // ----------------------------------------------------
+
+  // Función que se ejecuta al enviar el formulario completo
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!formData.video_url) {
+        alert("Por favor, sube un video primero.");
+        return;
+    }
     onSubmit(formData);
   };
 
@@ -38,8 +82,21 @@ const QuestionForm = ({ onSubmit, initialData = {} }) => {
       <label style={labelStyle}>Texto de la Pregunta</label>
       <input style={inputStyle} type="text" name="question_text" value={formData.question_text} onChange={handleChange} placeholder="Ej: ¿Qué jugador marcó el gol?" required />
       
-      <label style={labelStyle}>URL del Video</label>
-      <input style={inputStyle} type="text" name="video_url" value={formData.video_url} onChange={handleChange} placeholder="https://ejemplo.com/video.mp4" required />
+      {/* --- SECCIÓN DE SUBIDA DE VIDEO --- */}
+      <label style={labelStyle}>Paso 1: Subir Archivo de Video</label>
+      <input 
+        type="file" 
+        accept="video/mp4,video/webm" 
+        onChange={handleVideoUpload} 
+        disabled={uploading}
+        style={{ marginBottom: '5px' }}
+      />
+      {/* Mostramos el estado de la subida */}
+      {uploadStatus && <p style={{ fontSize: '0.9em', margin: '0 0 15px 0', fontStyle: 'italic' }}>Estado: {uploadStatus}</p>}
+      
+      <label style={labelStyle}>Paso 2: URL del Video (se rellenará automáticamente)</label>
+      <input style={inputStyle} type="text" name="video_url" value={formData.video_url} onChange={handleChange} placeholder="Sube un video para generar la URL" readOnly required />
+      {/* --------------------------------- */}
       
       <label style={labelStyle}>Segundo de Pausa del Video</label>
       <input style={inputStyle} type="number" name="pause_timestamp_secs" value={formData.pause_timestamp_secs} onChange={handleChange} required />
