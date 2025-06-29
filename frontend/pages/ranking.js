@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { getSocket } from '../lib/socket';
+import { getPlayerSocket } from '../lib/socket';
 
 export default function RankingPage() {
   const [ranking, setRanking] = useState([]); // Inicia como un array vacío
 
   useEffect(() => {
-    const socket = getSocket();
+    const socket = getPlayerSocket();
 
     const handleUpdateRanking = (newRanking) => {
       // Añadimos un log para ver qué datos llegan en la consola del navegador
