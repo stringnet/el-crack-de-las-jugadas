@@ -6,19 +6,15 @@ import Layout from '../components/Layout';
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
 
+  // Este efecto se encarga de la redirección global cuando inicia un juego.
+  // Esta lógica no se modifica.
   useEffect(() => {
     const socket = getPlayerSocket();
 
     const handleGameStarted = () => {
-      console.log('Evento global game_started recibido.');
-      
-      // --- ESTA ES LA CORRECCIÓN CLAVE ---
-      // Solo redirigimos al usuario si NO está ya en la página de ranking o en la de proyección.
+      // Solo redirigimos si el usuario NO está en una página de "espectador".
       if (router.pathname !== '/ranking' && router.pathname !== '/proyeccion') {
-        console.log('Redirigiendo a /juego...');
         router.push('/juego');
-      } else {
-        console.log('No se redirige, el usuario es un espectador en /ranking o /proyeccion.');
       }
     };
 
@@ -29,6 +25,16 @@ function MyApp({ Component, pageProps }) {
     };
   }, [router]);
 
+
+  // --- ESTA ES LA NUEVA LÓGICA DE RENDERIZADO CONDICIONAL ---
+  
+  // Si la ruta actual es la de proyección, devolvemos el componente de la página
+  // directamente, sin el Layout, para que ocupe toda la pantalla.
+  if (router.pathname === '/proyeccion') {
+    return <Component {...pageProps} />;
+  }
+  
+  // Para todas las demás páginas, sí usamos el Layout que les da el fondo gris y los márgenes.
   return (
     <Layout>
       <Component {...pageProps} />
