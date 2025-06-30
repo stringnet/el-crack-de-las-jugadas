@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { getPlayerSocket } from '../lib/socket'; // Importamos nuestro gestor de socket
+import { getPlayerSocket } from '../lib/socket';
 import Timer from '../components/Timer';
 import AnswerOptions from '../components/AnswerOptions';
 
 export default function GamePage() {
   const router = useRouter();
-  // Estados para controlar la vista: 'waiting_for_start', 'playing', 'question', 'answered', 'game_over'
   const [gameState, setGameState] = useState('waiting_for_start');
   const [question, setQuestion] = useState(null);
   const [finalScore, setFinalScore] = useState(null);
@@ -15,27 +14,22 @@ export default function GamePage() {
   const [socketId, setSocketId] = useState(null);
 
   useEffect(() => {
-    // Obtenemos el nombre del jugador guardado en la sesión del navegador
     const name = sessionStorage.getItem('playerName');
     if (!name) {
-      router.push('/'); // Si no hay nombre, lo mandamos a la página de inicio
+      router.push('/');
       return;
     }
     setPlayerName(name);
 
-    // Obtenemos la instancia única del socket
     const socket = getPlayerSocket();
 
-    // --- Definimos los manejadores de eventos del socket ---
-
     const handleConnect = () => {
-      console.log(`Conectado al servidor con ID: ${socket.id}`);
-      setSocketId(socket.id); // Guardamos nuestro ID de socket
+      console.log(`[JUGADOR] Conectado con ID: ${socket.id}. Uniéndose como ${name}`);
+      setSocketId(socket.id);
       socket.emit('player:join', { name });
     };
 
     const handleGameStarted = () => {
-      console.log("Evento 'game_started' recibido. Reseteando vista.");
       setQuestion(null);
       setFinalScore(null);
       setError('');
@@ -43,34 +37,23 @@ export default function GamePage() {
     };
 
     const handleNewQuestion = (newQuestion) => {
-      console.log("Nueva pregunta recibida:", newQuestion.question_text);
       setQuestion(newQuestion);
       setGameState('question');
     };
 
-    const handleGameOver = ({ finalRanking }) => {
-      console.log("Juego terminado, buscando mi puntaje...");
-      // Buscamos nuestro puntaje usando el socket.id que guardamos
-      const myResult = finalRanking.find(player => player.socket_id === socket.id);
-      setFinalScore(myResult ? myResult.score : 0);
-      setGameState('game_over');
-    };
-
-    const handleError = (data) => {
-      setError(data.message);
-    };
-
-    // --- MEJORA DE SINCRONIZACIÓN ---
-    // Esta función se activará cuando el servidor nos diga que el tiempo se acabó
     const handleTimeUpFromServer = () => {
-      console.log("Tiempo finalizado (señal del servidor). Limpiando pregunta.");
       setQuestion(null);
       setGameState('playing');
     };
     
-    // --- Nos suscribimos a los eventos del socket ---
+    const handleGameOver = ({ finalRanking }) => {
+      const myResult = finalRanking.find(player => player.socket_id === socketId);
+      setFinalScore(myResult ? myResult.score : 0);
+      setGameState('game_over');
+    };
 
-    // Si ya estamos conectados, nos unimos. Si no, esperamos al evento 'connect'.
+    const handleError = (data) => setError(data.message);
+
     if (socket.connected) {
       handleConnect();
     } else {
@@ -80,29 +63,36 @@ export default function GamePage() {
     socket.on('server:game_started', handleGameStarted);
     socket.on('server:new_question', handleNewQuestion);
     socket.on('server:game_over', handleGameOver);
-    socket.on('server:time_up', handleTimeUpFromServer); // <-- Listener para el nuevo evento
+    socket.on('server:time_up', handleTimeUpFromServer);
     socket.on('server:error', handleError);
 
-    // Función de limpieza: se ejecuta cuando el usuario cambia de página.
-    // Es crucial para evitar errores y fugas de memoria.
     return () => {
       socket.off('connect', handleConnect);
       socket.off('server:game_started', handleGameStarted);
       socket.off('server:new_question', handleNewQuestion);
       socket.off('server:game_over', handleGameOver);
-      socket.off('server:time_up', handleTimeUpFromServer); // <-- Limpiamos el nuevo listener
+      socket.off('server:time_up', handleTimeUpFromServer);
       socket.off('server:error', handleError);
     };
-  }, [router]);
+  }, [router, socketId]); // Dependemos de socketId para asegurar que la búsqueda de puntaje funcione
 
-  // Función que se llama cuando el jugador hace clic en una respuesta
+  // --- FUNCIÓN CLAVE CORREGIDA Y ROBUSTA ---
   const handleSelectAnswer = (answerIndex) => {
-    const socket = getSocket();
-    socket.emit('player:submit_answer', { questionId: question.id, answerId: answerIndex });
-    setGameState('answered');
+    const socket = getPlayerSocket();
+    // Verificamos que el socket esté conectado Y que haya una pregunta activa en pantalla
+    if (socket && socket.connected && question) {
+      socket.emit('player:submit_answer', { 
+        questionId: question.id, 
+        answerId: answerIndex 
+      });
+      // Log para verificar en la consola del NAVEGADOR que el evento se envió
+      console.log(`[JUGADOR] Enviando respuesta. Pregunta ID: ${question.id}, Opción elegida: ${answerIndex}`);
+      setGameState('answered'); 
+    } else {
+      console.error('[JUGADOR] No se pudo enviar la respuesta. El socket no está conectado o no hay pregunta activa.');
+    }
   };
 
-  // Esta función decide qué mostrar en pantalla según el estado del juego
   const renderContent = () => {
     if (error) return <h2 style={{ color: 'red' }}>Error: {error}</h2>;
 
@@ -113,7 +103,6 @@ export default function GamePage() {
             <Timer 
               duration={question.time_limit_secs || 15} 
               onTimeUp={() => { 
-                // Cuando el temporizador local termina, también limpiamos la vista
                 setQuestion(null); 
                 setGameState('playing'); 
               }} 
@@ -123,7 +112,7 @@ export default function GamePage() {
           </>
         );
       case 'answered':
-        return <h2>¡Respuesta enviada! Esperando...</h2>;
+        return <h2>¡Respuesta enviada! Esperando la siguiente jugada...</h2>;
       case 'playing':
         return <h2>¡Juego en curso! Esperando que el admin envíe la siguiente pregunta...</h2>;
       case 'game_over':
