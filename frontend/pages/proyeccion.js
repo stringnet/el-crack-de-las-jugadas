@@ -1,138 +1,188 @@
 import { useEffect, useState, useRef } from 'react';
 import io from 'socket.io-client';
 
-// --- ESTILOS FINALES PARA RECREAR TU DISEÑO EXACTO ---
-const styles = {
-  // Contenedor base que ocupa toda la pantalla
-  baseContainer: {
-    width: '100vw',
-    height: '100vh',
-    fontFamily: 'system-ui, sans-serif',
-    overflow: 'hidden',
-  },
-  // --- VISTA DE ESPERA ---
-  waitingView: {
-    width: '100%',
-    height: '100%',
-    display: 'flex', // Usamos flexbox para las dos columnas
-  },
-  leftColumn: {
-    width: '40%',
-    backgroundColor: '#1C1C1C', // Fondo negro
-    color: 'white',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: '40px',
-    boxSizing: 'border-box'
-  },
-  rightColumn: {
-    width: '60%',
-    backgroundSize: 'cover',
-    backgroundPosition: 'center center',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  qrCodePlaceholder: {
-    width: '250px',
-    height: '250px',
-    backgroundColor: 'white',
-    border: '1px solid white',
-    marginBottom: '20px',
-    // Aquí podrías poner un componente de QR real en el futuro
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    color: 'black',
-    fontSize: '1.2em'
-  },
-  scanText: {
-    color: '#FFC700', // Amarillo
-    fontSize: '2em',
-    fontWeight: 'bold',
-  },
-  logoPlaceholder: {
-    position: 'absolute',
-    bottom: '40px',
-    left: '40px',
-    fontSize: '1.5em'
-  },
-  rightColumnContent: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '10px'
-  },
-  title: {
-    backgroundColor: '#FFC700',
-    color: '#1C1C1C',
-    padding: '15px 50px',
-    borderRadius: '40px',
-    fontSize: 'clamp(2em, 5vw, 3.5em)',
-    fontWeight: 'bold',
-  },
-  subtitle: {
-    backgroundColor: '#1C1C1C',
-    color: 'white',
-    padding: '10px 40px',
-    borderRadius: '40px',
-    fontSize: 'clamp(1.5em, 4vw, 2.5em)',
-    fontWeight: 'bold',
-    clipPath: 'polygon(0% 0%, 100% 0%, 95% 50%, 100% 100%, 0% 100%, 5% 50%)', // Forma de flecha
-  },
+// --- Estilos Finales y Pulidos ---
 
-  // --- VISTA DE PREGUNTA (sin cambios de estilo) ---
-  questionView: { /* ... estilos de la respuesta anterior ... */ },
-  video: { /* ... estilos de la respuesta anterior ... */ },
-  questionText: { /* ... estilos de la respuesta anterior ... */ },
+const styles = {
+
+  // Contenedor base que ocupa toda la pantalla
+
+  baseContainer: {
+    width: '100vw',
+    height: '100vh',
+    backgroundColor: 'black',
+    color: 'white',
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif',
+    textAlign: 'center',
+    overflow: 'hidden', // Evita barras de scroll
+  },
+
+  // Estilos para la vista de pregunta
+
+  questionView: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    padding: '20px',
+    boxSizing: 'border-box'
+  },
+
+  video: {
+    width: '80%',
+    maxHeight: '60vh',
+    border: '4px solid white',
+    borderRadius: '10px',
+    backgroundColor: '#111'
+  },
+
+  questionText: {
+    fontSize: 'clamp(1.5em, 5vw, 3.5em)', // Tamaño de fuente adaptable
+    margin: '20px 0',
+    textShadow: '2px 2px 4px #000'
+  },
+  optionsContainer: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+    gap: '20px',
+    width: '80%',
+  },
+  option: {
+    backgroundColor: '#333',
+    padding: '20px',
+    borderRadius: '10px',
+    fontSize: 'clamp(1em, 3vw, 1.8em)',
+    border: '2px solid #555',
+    transition: 'all 0.3s ease'
+  },
+
+  correctOption: {
+    backgroundColor: '#28a745',
+    borderColor: '#90ee90',
+    transform: 'scale(1.05)',
+    boxShadow: '0 0 15px lightgreen',
+  },
+
+  // Estilos para la pantalla de espera
+  waitingContainer: {
+    width: '100%',
+    height: '100%',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center center',
+    backgroundRepeat: 'no-repeat',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'flex-end', // Empuja el banner hacia abajo
+    alignItems: 'center',
+  },
+
+  waitingBanner: {
+    width: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    padding: '20px 40px',
+    boxSizing: 'border-box',
+  },
+
+  waitingText: {
+    fontSize: 'clamp(2em, 5vw, 3.5em)',
+    fontWeight: 'bold',
+    textShadow: '3px 3px 6px #000',
+    margin: 0,
+  }
 };
 
 export default function ProjectionPage() {
-  const [question, setQuestion] = useState(null);
-  const [revealedAnswer, setRevealedAnswer] = useState(null);
-  const [settings, setSettings] = useState(null);
-  const videoRef = useRef(null);
+  const [question, setQuestion] = useState(null);
+  const [revealedAnswer, setRevealedAnswer] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const videoRef = useRef(null);
 
-  // LA LÓGICA DEL "MOTOR" SE MANTIENE INTACTA
-  useEffect(() => { /* ...código de sockets sin cambios... */ }, []);
-  useEffect(() => { /* ...código de video sin cambios... */ }, [question, revealedAnswer]);
+  // EFECTO 1: Carga la configuración y establece la conexión del socket
 
-  // --- LÓGICA DE RENDERIZADO FINAL ---
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/settings`);
+        if (res.ok) setSettings(await res.json());
+      } catch (err) { console.error("Error al cargar configuración.", err); }
+    };
+    fetchSettings();
 
-  if (question) {
-    // Si hay una pregunta, mostramos la vista de video (esta parte no cambia)
-    return (
-      <div style={{...styles.baseContainer, ...styles.questionView}}>
-        <video key={question.id} ref={videoRef} style={styles.video} muted playsInline>
-          <source src={question.video_url} type="video/mp4" />
-        </video>
-        <h1 style={styles.questionText}>{question.question_text}</h1>
-      </div>
-    );
-  }
+    const socket = io(`${process.env.NEXT_PUBLIC_BACKEND_URL}/projection`);
+    const handleNewQuestion = (newQuestion) => { setRevealedAnswer(null); setQuestion(newQuestion); };
+    const handleRevealAnswer = ({ correctOption }) => setRevealedAnswer(correctOption);
+    const resetScreen = () => { setQuestion(null); setRevealedAnswer(null); };
 
-  // Si NO hay pregunta, mostramos la NUEVA pantalla de espera personalizada
-  return (
-    <div style={{...styles.baseContainer, ...styles.waitingView}}>
-        <div style={styles.leftColumn}>
-            {/* El QR real se generaría con una librería, esto es un placeholder */}
-            <div style={styles.qrCodePlaceholder}>
-                <img src="https://i.imgur.com/gL5gC0A.png" alt="QR Code" style={{width: '100%', height: '100%'}} />
-            </div>
-            <p style={styles.scanText}>Escanea el QR</p>
-            <p>para empezar a jugar</p>
-            <div style={styles.logoPlaceholder}>
-                ◆ PagoEfectivo
-            </div>
-        </div>
-        <div style={{ ...styles.rightColumn, backgroundImage: `url(${settings?.projection_background_url || '/Fondo1920x1080.png'})` }}>
-            <div style={styles.rightColumnContent}>
-                <div style={styles.title}>El Crack de las Jugadas</div>
-                <div style={styles.subtitle}>Sigue las instrucciones</div>
-            </div>
-        </div>
-    </div>
-  );
+    socket.on('server:new_question', handleNewQuestion);
+    socket.on('server:reveal_answer', handleRevealAnswer);
+    socket.on('server:game_over', resetScreen);
+    socket.on('server:game_started', resetScreen);
+    return () => { socket.disconnect(); };
+  }, []);
+
+  // EFECTO 2: Gestiona el video cuando cambia la pregunta o se revela la respuesta
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const timeUpdateListener = () => {
+      if (question && !video.paused && video.currentTime >= question.pause_timestamp_secs) {
+        video.pause();
+      }
+    };
+
+    // Limpiamos listeners anteriores para evitar duplicados
+
+    video.removeEventListener('timeupdate', timeUpdateListener);
+    if (question && !revealedAnswer) {
+      if (question.video_url && question.video_url.trim() !== '') {
+        const handleCanPlay = () => video.play().catch(e => console.error("Error de Autoplay:", e));
+        video.addEventListener('canplay', handleCanPlay, { once: true });
+        video.addEventListener('timeupdate', timeUpdateListener);
+        video.src = question.video_url;
+        video.load();
+      }
+    } else if (question && revealedAnswer) {
+      video.play().catch(e => console.error("Error al reanudar:", e));
+    }
+
+    return () => { video.removeEventListener('timeupdate', timeUpdateListener); };
+  }, [question, revealedAnswer]);
+
+  // --- LÓGICA DE RENDERIZADO FINAL ---
+  // Si hay una pregunta, mostramos la vista del juego
+
+  if (question) {
+    const options = [question.option_1, question.option_2, question.option_3, question.option_4];
+    return (
+      <div style={{...styles.baseContainer, ...styles.questionView}}>
+        <video key={question.id} ref={videoRef} style={styles.video} muted playsInline>
+          <source src={question.video_url} type="video/mp4" />
+        </video>
+        <h1 style={styles.questionText}>{question.question_text}</h1>
+        <div style={styles.optionsContainer}>
+          {options.map((text, index) => {
+            const optionNumber = index + 1;
+            const isCorrect = revealedAnswer === optionNumber;
+            return <div key={optionNumber} style={{...styles.option, ...(isCorrect && styles.correctOption)}}>{text}</div>;
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // Si no hay pregunta, mostramos la pantalla de espera personalizada
+
+  return (
+    <div style={styles.baseContainer}>
+      <div style={{ ...styles.waitingContainer, backgroundImage: `url(${settings?.projection_background_url || ''})` }}>
+        <div style={styles.waitingBanner}>
+          <h1 style={styles.waitingText}>
+            Esperando que el administrador inicie el juego...
+          </h1>
+        </div>
+      </div>
+    </div>
+  );
 }
