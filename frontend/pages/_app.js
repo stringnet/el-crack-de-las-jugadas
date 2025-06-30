@@ -9,8 +9,8 @@ function MyApp({ Component, pageProps }) {
   useEffect(() => {
     const socket = getPlayerSocket();
     const handleGameStarted = () => {
-      const noRedirectRoutes = ['/ranking', '/proyeccion'];
-      if (!noRedirectRoutes.includes(router.pathname)) {
+      // No redirigimos si el usuario está en una página de "espectador".
+      if (router.pathname !== '/ranking' && router.pathname !== '/proyeccion') {
         router.push('/juego');
       }
     };
@@ -26,7 +26,7 @@ function MyApp({ Component, pageProps }) {
     return <Component {...pageProps} />;
   }
   
-  // Para todas las demás páginas, sí usamos el Layout.
+  // Para todas las demás páginas (juego, ranking), sí usamos el Layout.
   return (
     <Layout>
       <Component {...pageProps} />
