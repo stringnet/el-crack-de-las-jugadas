@@ -10,6 +10,7 @@ export default function GamePage() {
   const [question, setQuestion] = useState(null);
   const [finalScore, setFinalScore] = useState(null);
   const [playerName, setPlayerName] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const name = sessionStorage.getItem('playerName');
@@ -21,27 +22,16 @@ export default function GamePage() {
 
     const socket = getPlayerSocket();
 
-    const handleConnect = () => {
-      console.log(`[JUGADOR] Conectado. Uniéndose como ${name}`);
-      socket.emit('player:join', { name });
-    };
-
-    const handleGameStarted = () => setGameState('playing');
+    const handleConnect = () => socket.emit('player:join', { name });
+    const handleGameStarted = () => { setQuestion(null); setFinalScore(null); setGameState('playing'); };
     const handleNewQuestion = (q) => { setQuestion(q); setGameState('question'); };
     const handleTimeUp = () => { setQuestion(null); setGameState('playing'); };
-    
     const handleGameOver = ({ finalRanking }) => {
-      console.log("Juego terminado. Ranking final recibido:", finalRanking);
-      
-      // --- CORRECCIÓN DEFINITIVA ---
-      // Buscamos nuestro puntaje usando el NOMBRE del jugador, que es persistente,
-      // en lugar del socket_id, que es temporal.
       const myResult = finalRanking.find(player => player.name === name);
-      
-      console.log(`Buscando a '${name}', resultado encontrado:`, myResult);
       setFinalScore(myResult ? myResult.score : 0);
       setGameState('game_over');
     };
+    const handleError = (data) => setError(data.message);
 
     if (socket.connected) {
       handleConnect();
@@ -53,6 +43,7 @@ export default function GamePage() {
     socket.on('server:new_question', handleNewQuestion);
     socket.on('server:time_up', handleTimeUp);
     socket.on('server:game_over', handleGameOver);
+    socket.on('server:error', handleError);
 
     return () => {
       socket.off('connect', handleConnect);
@@ -60,26 +51,33 @@ export default function GamePage() {
       socket.off('server:new_question', handleNewQuestion);
       socket.off('server:time_up', handleTimeUp);
       socket.off('server:game_over', handleGameOver);
+      socket.off('server:error', handleError);
     };
   }, [router]);
 
   const handleSelectAnswer = (answerIndex) => {
     const socket = getPlayerSocket();
     if (socket && socket.connected && question) {
-      socket.emit('player:submit_answer', { 
-        questionId: question.id, 
-        answerId: answerIndex 
-      });
+      socket.emit('player:submit_answer', { questionId: question.id, answerId: answerIndex });
       setGameState('answered'); 
     }
   };
 
   const renderContent = () => {
+    if (error) return <h2 style={{ color: 'red' }}>Error: {error}</h2>;
+
     switch(gameState) {
       case 'question':
         return (
           <>
-            <Timer duration={question.time_limit_secs || 15} onTimeUp={() => setGameState('playing')} />
+            {/* --- TEMPORIZADOR RESTAURADO --- */}
+            <Timer 
+              duration={question.time_limit_secs || 15} 
+              onTimeUp={() => { 
+                setQuestion(null); 
+                setGameState('playing'); 
+              }} 
+            />
             <h2>{question.question_text}</h2>
             <AnswerOptions question={question} onSelectAnswer={handleSelectAnswer} />
           </>
