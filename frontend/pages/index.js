@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 
 const styles = {
-    container: { width: '100vw', height: '100vh', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', textAlign: 'center', backgroundSize: 'cover', backgroundPosition: 'center', fontFamily: 'system-ui, sans-serif', transition: 'background-image 0.5s ease-in-out' },
+    container: { width: '100vw', height: '100vh', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', textAlign: 'center', backgroundSize: 'cover', backgroundPosition: 'center', fontFamily: 'system-ui, sans-serif' },
     splashContent: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textShadow: '2px 2px 4px rgba(0,0,0,0.5)', padding: '20px', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: '20px' },
     title: { backgroundColor: '#FFC700', color: '#1C1C1C', padding: '15px 40px', borderRadius: '30px', fontSize: 'clamp(1.5em, 5vw, 2.5em)', fontWeight: 'bold' },
     playButton: { backgroundColor: 'white', color: 'black', padding: '15px 60px', borderRadius: '30px', fontSize: 'clamp(1.2em, 4vw, 2em)', fontWeight: 'bold', border: 'none', cursor: 'pointer', marginTop: '10px' },
@@ -23,12 +23,12 @@ export default function HomePage() {
     const fetchSettings = async () => {
         try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/settings`);
-            if (res.ok) {
-                const data = await res.json();
-                console.log("Settings cargados para HomePage:", data);
-                setSettings(data);
-            }
-        } catch (err) { console.error("Error al cargar configuración para la página de inicio.", err); }
+            if (res.ok) setSettings(await res.json());
+            else setSettings({});
+        } catch (err) { 
+            console.error("Error al cargar configuración para la página de inicio.", err);
+            setSettings({});
+        }
     };
     fetchSettings();
   }, []);
@@ -40,6 +40,10 @@ export default function HomePage() {
       router.push('/juego');
     } else { alert("Por favor, ingresa un nombre para jugar."); }
   };
+
+  if (!settings) {
+    return <div style={{width: '100vw', height: '100vh', backgroundColor: '#111', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', fontSize: '2em'}}>Cargando...</div>;
+  }
 
   const splashBackground = settings?.player_splash_image_url || '/PANTALLA-DE-INICIO-MOVIL.png';
 
