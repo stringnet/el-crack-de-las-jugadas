@@ -9,8 +9,8 @@ function MyApp({ Component, pageProps }) {
   useEffect(() => {
     const socket = getPlayerSocket();
     const handleGameStarted = () => {
-      // No redirigimos si el usuario está en una página de "espectador".
-      if (router.pathname !== '/ranking' && router.pathname !== '/proyeccion') {
+      const noRedirectRoutes = ['/ranking', '/proyeccion'];
+      if (!noRedirectRoutes.includes(router.pathname)) {
         router.push('/juego');
       }
     };
