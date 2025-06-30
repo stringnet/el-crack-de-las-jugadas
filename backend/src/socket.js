@@ -48,6 +48,8 @@ function initSocket(server) {
       
       const question = gameState.currentQuestion;
       
+      console.log(`[SUBMIT] Validando: Respuesta del jugador=${answerId} (tipo: ${typeof answerId}), Respuesta correcta=${question.correct_option} (tipo: ${typeof question.correct_option})`);
+
       if (parseInt(question.correct_option) === parseInt(answerId)) {
         try {
           const points = parseInt(question.points) || 10;
@@ -71,10 +73,31 @@ function initSocket(server) {
   });
 
   admin_nsp.on('connection', (socket) => {
-    socket.on('admin:start_game', () => { /* ...código sin cambios... */ });
+    console.log(`[ADMIN] Admin conectado: ${socket.id}`);
 
-    socket.on('admin:end_game', async () => { /* ...código sin cambios... */ });
+    socket.on('admin:start_game', async () => {
+      console.log('--- JUEGO INICIADO ---');
+      if (gameState.questionTimer) clearTimeout(gameState.questionTimer);
+      // Descomenta la siguiente línea si quieres que el ranking histórico se borre al iniciar un nuevo juego
+      // await db.query('TRUNCATE TABLE players RESTART IDENTITY;');
+      gameState.isActive = true;
+      gameState.currentQuestion = null;
+      
+      const namespaces = [players_nsp, projection_nsp];
+      namespaces.forEach(nsp => nsp.emit('server:game_started'));
+    });
 
+    socket.on('admin:end_game', async () => {
+        if (!gameState.isActive) return;
+        console.log('--- JUEGO FINALIZADO ---');
+        if (gameState.questionTimer) clearTimeout(gameState.questionTimer);
+        gameState.isActive = false;
+        const finalRanking = await getRanking();
+        
+        const namespaces = [players_nsp, projection_nsp];
+        namespaces.forEach(nsp => nsp.emit('server:game_over', { finalRanking }));
+    });
+    
     // --- FUNCIÓN DE ENVIAR PREGUNTA ACTUALIZADA CON PERIODO DE GRACIA ---
     socket.on('admin:next_question', (question) => {
         if (!gameState.isActive) return;
@@ -92,22 +115,39 @@ function initSocket(server) {
             players_nsp.emit('server:time_up');
             projection_nsp.emit('server:reveal_answer', { correctOption: question.correct_option });
 
-            // CORRECCIÓN DE LA CONDICIÓN DE CARRERA: Periodo de gracia
+            // CORRECCIÓN DE LA CONDICIÓN DE CARRERA
+            // Damos un periodo de gracia de 3 segundos antes de limpiar la pregunta actual,
+            // para que las respuestas de último momento puedan ser procesadas.
             setTimeout(() => {
+                // Verificamos que la pregunta que vamos a limpiar sea la misma que inició el timer
                 if (gameState.currentQuestion && gameState.currentQuestion.id === question.id) {
                     console.log(`[GRACIA] Limpiando pregunta actual (ID: ${question.id}) después del periodo de gracia.`);
                     gameState.currentQuestion = null;
                 }
-            }, 3000); // 3 segundos de gracia para que lleguen las respuestas
+            }, 3000); // 3 segundos de gracia
 
         }, timeLimit);
     });
   });
 
-  async function getPlayerByName(name) { /* ...código sin cambios... */ }
-  async function getPlayerBySocketId(socketId) { /* ...código sin cambios... */ }
-  async function getRanking() { /* ...código sin cambios... */ }
-  async function broadcastRanking(targetSocket = null) { /* ...código sin cambios... */ }
+  // Funciones auxiliares para la base de datos
+  async function getPlayerByName(name) {
+    const { rows } = await db.query('SELECT * FROM players WHERE name = $1 LIMIT 1', [name]);
+    return rows[0];
+  }
+  async function getPlayerBySocketId(socketId) {
+    const { rows } = await db.query('SELECT * FROM players WHERE socket_id = $1 LIMIT 1', [socketId]);
+    return rows[0];
+  }
+  async function getRanking() {
+    const { rows } = await db.query('SELECT id, name, score, socket_id FROM players ORDER BY score DESC, name ASC LIMIT 10');
+    return rows;
+  }
+  async function broadcastRanking(targetSocket = null) {
+    const ranking = await getRanking();
+    const target = targetSocket || players_nsp;
+    target.emit('server:update_ranking', ranking);
+  }
 
   console.log('Socket.IO del Servidor inicializado con lógica final y periodo de gracia.');
   return io;
