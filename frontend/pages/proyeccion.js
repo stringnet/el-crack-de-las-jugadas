@@ -2,7 +2,9 @@ import { useEffect, useState, useRef } from 'react';
 import io from 'socket.io-client';
 
 const styles = {
+  // Contenedor base que ocupa toda la pantalla
   baseContainer: { width: '100vw', height: '100vh', fontFamily: 'system-ui, sans-serif', textAlign: 'center', overflow: 'hidden' },
+  // Estilos para la vista de pregunta
   questionView: { backgroundColor: '#FFC700', color: '#0D2447', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '20px', boxSizing: 'border-box' },
   video: { width: 'auto', height: 'auto', maxWidth: '65%', maxHeight: '55vh', borderRadius: '25px', boxShadow: '0px 10px 30px rgba(0,0,0,0.2)', backgroundColor: '#000' },
   questionText: { fontSize: 'clamp(2em, 5vw, 3.5em)', margin: '30px 0', fontWeight: 'bold' },
@@ -10,6 +12,32 @@ const styles = {
   option: { backgroundColor: '#1C1C1C', color: '#FFC700', padding: '20px', borderRadius: '16px', fontSize: 'clamp(1em, 2.5vw, 1.8em)', fontWeight: 'bold' },
   correctOption: { backgroundColor: '#28a745', color: 'white', transform: 'scale(1.05)' },
   waitingView: { width: '100%', height: '100%', backgroundColor: '#000', backgroundSize: 'cover', backgroundPosition: 'center center', backgroundRepeat: 'no-repeat' }
+  // Estilos para la pantalla de espera
+  waitingContainer: {
+    width: '100%',
+    height: '100%',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center center',
+    backgroundRepeat: 'no-repeat',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'flex-end', // Empuja el banner hacia abajo
+    alignItems: 'center',
+  },
+
+  waitingBanner: {
+    width: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    padding: '20px 40px',
+    boxSizing: 'border-box',
+  },
+
+  waitingText: {
+    fontSize: 'clamp(2em, 5vw, 3.5em)',
+    fontWeight: 'bold',
+    textShadow: '3px 3px 6px #000',
+    margin: 0,
+  }
 };
 
 export default function ProjectionPage() {
