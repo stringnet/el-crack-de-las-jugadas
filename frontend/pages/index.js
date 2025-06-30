@@ -23,7 +23,11 @@ export default function HomePage() {
     const fetchSettings = async () => {
         try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/settings`);
-            if (res.ok) setSettings(await res.json());
+            if (res.ok) {
+                const data = await res.json();
+                console.log("Settings cargados para HomePage:", data);
+                setSettings(data);
+            }
         } catch (err) { console.error("Error al cargar configuración para la página de inicio.", err); }
     };
     fetchSettings();
@@ -37,7 +41,6 @@ export default function HomePage() {
     } else { alert("Por favor, ingresa un nombre para jugar."); }
   };
 
-  // Usamos la URL del estado si ya cargó, si no, usamos la imagen local como respaldo.
   const splashBackground = settings?.player_splash_image_url || '/PANTALLA-DE-INICIO-MOVIL.png';
 
   if (step === 'splash') {
