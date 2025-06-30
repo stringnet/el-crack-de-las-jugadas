@@ -2,9 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import io from 'socket.io-client';
 
 const styles = {
-  // Contenedor base que ocupa toda la pantalla
   baseContainer: { width: '100vw', height: '100vh', fontFamily: 'system-ui, sans-serif', textAlign: 'center', overflow: 'hidden' },
-  // Estilos para la vista de pregunta
   questionView: { backgroundColor: '#FFC700', color: '#0D2447', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '20px', boxSizing: 'border-box' },
   video: { width: 'auto', height: 'auto', maxWidth: '65%', maxHeight: '55vh', borderRadius: '25px', boxShadow: '0px 10px 30px rgba(0,0,0,0.2)', backgroundColor: '#000' },
   questionText: { fontSize: 'clamp(2em, 5vw, 3.5em)', margin: '30px 0', fontWeight: 'bold' },
@@ -81,7 +79,7 @@ export default function ProjectionPage() {
     );
   }
 
-  // La pantalla de espera ahora es una única imagen a pantalla completa.
+  // Pantalla de espera definitiva
   return (
     <div style={{ ...styles.baseContainer, ...styles.waitingView, backgroundImage: `url(${settings?.projection_background_url || ''})` }} />
   );
