@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { getAdminSocket } from '../lib/socket';
-import withAuth from '../components/withAuth'; // <-- 1. IMPORTAMOS EL GUARDIA DE SEGURIDAD
+import withAuth from '../components/withAuth';
 
-function AdminDashboard() { // <-- 2. La función ahora es una declaración normal, no una exportación por defecto
+function AdminDashboard() {
   const [questions, setQuestions] = useState([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState('');
   const [socket, setSocket] = useState(null);
@@ -17,15 +17,26 @@ function AdminDashboard() { // <-- 2. La función ahora es una declaración norm
 
     const fetchQuestions = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/questions`);
+        // Obtenemos el token del almacenamiento local para autenticar la petición
+        const token = localStorage.getItem('admin_token');
+
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/questions`, {
+          headers: {
+            // --- AÑADIMOS ESTA CABECERA DE AUTORIZACIÓN ---
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
         if (res.ok) {
             const data = await res.json();
             setQuestions(data);
             if (data.length > 0) {
                 setSelectedQuestionId(data[0].id);
             }
+        } else {
+            console.error("No se pudieron cargar las preguntas, posible error de autenticación.");
         }
-      } catch (err) { console.error(err); }
+      } catch (err) { console.error("Error de red al cargar preguntas:", err); }
     };
     fetchQuestions();
 
@@ -79,7 +90,7 @@ function AdminDashboard() { // <-- 2. La función ahora es una declaración norm
        <div style={{ background: '#fee', padding: '20px', borderRadius: '8px' }}>
         <h2>Control General del Juego</h2>
         <button onClick={startGame} style={{ padding: '10px 20px', fontSize: '1rem' }}>
-          Iniciar Juego (Reiniciar)
+          Iniciar Juego (Modelo Histórico)
         </button>
         <button onClick={endGame} style={{ padding: '10px 20px', marginLeft: '10px', fontSize: '1rem' }}>
           Finalizar Juego
@@ -89,5 +100,5 @@ function AdminDashboard() { // <-- 2. La función ahora es una declaración norm
   );
 }
 
-// --- 3. EXPORTAMOS LA VERSIÓN PROTEGIDA DEL DASHBOARD ---
+// Exportamos la versión protegida del Dashboard
 export default withAuth(AdminDashboard);
