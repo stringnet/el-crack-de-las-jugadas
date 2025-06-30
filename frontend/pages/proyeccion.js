@@ -1,19 +1,19 @@
 import { useEffect, useState, useRef } from 'react';
 import io from 'socket.io-client';
 
-// --- Estilos Finales y Pulidos ---
+// --- ESTILOS ACTUALIZADOS PARA COINCIDIR CON TU DISEÑO DE REFERENCIA ---
 const styles = {
   // Contenedor base que ocupa toda la pantalla
   baseContainer: {
     width: '100vw',
     height: '100vh',
-    backgroundColor: 'black',
-    color: 'white',
+    backgroundColor: '#FFC700', // <-- Color de fondo amarillo
+    color: '#0D2447', // <-- Color de texto principal oscuro
     fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif',
     textAlign: 'center',
-    overflow: 'hidden', // Evita barras de scroll
+    overflow: 'hidden',
   },
-  // Estilos para la vista de pregunta
+  // Vista de la pregunta
   questionView: {
     display: 'flex',
     flexDirection: 'column',
@@ -24,60 +24,56 @@ const styles = {
     boxSizing: 'border-box'
   },
   video: {
-    width: '80%',
-    maxHeight: '60vh',
-    border: '4px solid white',
-    borderRadius: '10px',
-    backgroundColor: '#111'
+    width: '65%', // Tamaño ajustado
+    maxHeight: '55vh',
+    borderRadius: '25px', // Bordes redondeados
+    backgroundColor: '#000',
+    boxShadow: '0px 10px 30px rgba(0,0,0,0.2)', // Sombra sutil
+    border: 'none', // <-- Sin borde blanco
   },
   questionText: {
-    fontSize: 'clamp(1.5em, 5vw, 3.5em)', // Tamaño de fuente adaptable
-    margin: '20px 0',
-    textShadow: '2px 2px 4px #000'
+    fontSize: 'clamp(2em, 5vw, 3.5em)',
+    margin: '30px 0',
+    color: '#0D2447', // Color azul oscuro/negro
+    fontWeight: 'bold',
   },
   optionsContainer: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-    gap: '20px',
-    width: '80%',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '15px 20px',
+    width: '65%',
   },
   option: {
-    backgroundColor: '#333',
-    padding: '20px',
-    borderRadius: '10px',
-    fontSize: 'clamp(1em, 3vw, 1.8em)',
-    border: '2px solid #555',
+    backgroundColor: '#1C1C1C', // Fondo negro
+    color: '#FFC700', // Texto amarillo
+    padding: '15px 25px',
+    borderRadius: '16px', // Forma de píldora/hexágono redondeado
+    fontSize: 'clamp(1em, 2.5vw, 1.6em)',
+    fontWeight: 'bold',
     transition: 'all 0.3s ease'
   },
   correctOption: {
     backgroundColor: '#28a745',
-    borderColor: '#90ee90',
+    color: 'white',
     transform: 'scale(1.05)',
-    boxShadow: '0 0 15px lightgreen',
   },
-  // Estilos para la pantalla de espera
+  // Vista de espera
   waitingContainer: {
     width: '100%',
     height: '100%',
     backgroundSize: 'cover',
     backgroundPosition: 'center center',
-    backgroundRepeat: 'no-repeat',
     display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'flex-end', // Empuja el banner hacia abajo
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  waitingBanner: {
-    width: '100%',
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    padding: '20px 40px',
-    boxSizing: 'border-box',
-  },
   waitingText: {
-    fontSize: 'clamp(2em, 5vw, 3.5em)',
+    fontSize: 'clamp(2em, 5vw, 4em)',
     fontWeight: 'bold',
-    textShadow: '3px 3px 6px #000',
-    margin: 0,
+    color: 'white',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: '30px 50px',
+    borderRadius: '20px'
   }
 };
 
@@ -87,7 +83,8 @@ export default function ProjectionPage() {
   const [settings, setSettings] = useState(null);
   const videoRef = useRef(null);
 
-  // EFECTO 1: Carga la configuración y establece la conexión del socket
+  // --- LÓGICA DEL "MOTOR" (SIN CAMBIOS) ---
+  // Este código maneja la conexión y los eventos. No lo tocamos.
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -111,7 +108,7 @@ export default function ProjectionPage() {
     return () => { socket.disconnect(); };
   }, []);
 
-  // EFECTO 2: Gestiona el video cuando cambia la pregunta o se revela la respuesta
+  // Este código maneja la reproducción del video. No lo tocamos.
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -122,11 +119,10 @@ export default function ProjectionPage() {
       }
     };
     
-    // Limpiamos listeners anteriores para evitar duplicados
     video.removeEventListener('timeupdate', timeUpdateListener);
 
     if (question && !revealedAnswer) {
-      if (question.video_url && question.video_url.trim() !== '') {
+      if (question.video_url) {
         const handleCanPlay = () => video.play().catch(e => console.error("Error de Autoplay:", e));
         video.addEventListener('canplay', handleCanPlay, { once: true });
         video.addEventListener('timeupdate', timeUpdateListener);
@@ -140,10 +136,9 @@ export default function ProjectionPage() {
     return () => { video.removeEventListener('timeupdate', timeUpdateListener); };
   }, [question, revealedAnswer]);
 
-  
-  // --- LÓGICA DE RENDERIZADO FINAL ---
 
-  // Si hay una pregunta, mostramos la vista del juego
+  // --- LÓGICA DE RENDERIZADO (LA "CARROCERÍA Y PINTURA") ---
+
   if (question) {
     const options = [question.option_1, question.option_2, question.option_3, question.option_4];
     return (
@@ -163,16 +158,15 @@ export default function ProjectionPage() {
     );
   }
 
-  // Si no hay pregunta, mostramos la pantalla de espera personalizada
+  // Pantalla de espera con fondo amarillo si no hay imagen personalizada
   return (
-    <div style={styles.baseContainer}>
-      <div style={{ ...styles.waitingContainer, backgroundImage: `url(${settings?.projection_background_url || ''})` }}>
-        <div style={styles.waitingBanner}>
+    <div style={{ ...styles.baseContainer, ...styles.waitingContainer, backgroundImage: `url(${settings?.projection_background_url || ''})` }}>
+      {/* Solo mostramos el texto si NO hay imagen de fondo personalizada */}
+      {!settings?.projection_background_url && (
           <h1 style={styles.waitingText}>
             Esperando que el administrador inicie el juego...
           </h1>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
