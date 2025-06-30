@@ -18,6 +18,7 @@ export default function ProjectionPage() {
   const [settings, setSettings] = useState(null);
   const videoRef = useRef(null);
 
+  // Lógica de Sockets y carga de configuración
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -37,6 +38,7 @@ export default function ProjectionPage() {
     return () => { socket.disconnect(); };
   }, []);
 
+  // Lógica de control del video
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -60,6 +62,9 @@ export default function ProjectionPage() {
     return () => { video.removeEventListener('timeupdate', timeUpdateListener); };
   }, [question, revealedAnswer]);
 
+  
+  // --- RENDERIZADO FINAL ---
+
   if (question) {
     const options = [question.option_1, question.option_2, question.option_3, question.option_4];
     return (
@@ -79,7 +84,7 @@ export default function ProjectionPage() {
     );
   }
 
-  // Pantalla de espera definitiva
+  // Pantalla de espera definitiva con el fondo personalizado.
   return (
     <div style={{ ...styles.baseContainer, ...styles.waitingView, backgroundImage: `url(${settings?.projection_background_url || ''})` }} />
   );
