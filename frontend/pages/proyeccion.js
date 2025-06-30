@@ -11,7 +11,7 @@ const styles = {
   optionsContainer: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px 20px', width: '65%' },
   option: { backgroundColor: '#1C1C1C', color: '#FFC700', padding: '20px', borderRadius: '16px', fontSize: 'clamp(1em, 2.5vw, 1.8em)', fontWeight: 'bold' },
   correctOption: { backgroundColor: '#28a745', color: 'white', transform: 'scale(1.05)' },
-  waitingView: { width: '100%', height: '100%', backgroundColor: '#000', backgroundSize: 'cover', backgroundPosition: 'center center', backgroundRepeat: 'no-repeat' }
+  waitingView: { width: '100%', height: '100%', backgroundColor: '#000', backgroundSize: 'cover', backgroundPosition: 'center center', backgroundRepeat: 'no-repeat' },
   // Estilos para la pantalla de espera
   waitingContainer: {
     width: '100%',
